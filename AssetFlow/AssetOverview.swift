@@ -9,6 +9,9 @@ struct AssetOverview: View {
     @Query private var holdings: [StockHolding]
     @Query private var transfers: [AssetTransfer]
     @Query private var expenses: [Expense]
+    @AppStorage("assetHistoryRange") private var historyRangeRaw = AssetHistoryRange.quarter.rawValue
+    private var historyRange: AssetHistoryRange { AssetHistoryRange(rawValue: historyRangeRaw) ?? .quarter }
+    private var history: [AssetHistoryPoint] { portfolio.history(in: historyRange) }
     @State private var creating = false
     @State private var transferring = false
 
@@ -96,16 +99,21 @@ struct AssetOverview: View {
                         Text("占比仅计算正余额；负余额请在账户中核对。")
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    Section("近 90 天资产变化") {
-                        if portfolio.history.count > 1 {
-                            Chart(portfolio.history) { point in
+                    Section("资产变化") {
+                        Picker("时间范围", selection: $historyRangeRaw) {
+                            ForEach(AssetHistoryRange.allCases) { range in
+                                Text(range.title).tag(range.rawValue)
+                            }
+                        }.pickerStyle(.segmented)
+                        if history.count > 1 {
+                            Chart(history) { point in
                                 LineMark(x: .value("日期", point.date), y: .value("人民币", Double(point.cents) / 100))
                                     .foregroundStyle(LedgerStyle.accent)
                             }.frame(height: 150).chartYAxisLabel("元")
                         } else {
-                            Text("积累记录后显示趋势").foregroundStyle(.secondary)
+                            Text("这个时间段记录不足，积累记录后显示趋势").foregroundStyle(.secondary)
                         }
-                        Text("从录入账户开始保留历史，估值更新不会改写之前的余额。新增资产也会引起总额变化，不能把趋势变化全部当作投资收益。")
+                        Text("仅展示已录入的历史，1 年按近 365 天计算。估值更新不会改写之前的余额。新增资产也会引起总额变化，不能把趋势变化全部当作投资收益。")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }

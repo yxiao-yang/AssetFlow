@@ -47,6 +47,11 @@ struct SettingsView: View {
             } footer: {
                 Text("选择后立即应用于整个 App，并在下次打开时保留。跟随系统会随 iPhone 的外观设置自动切换。")
             }
+            Section("记账") {
+                NavigationLink { ShortcutSetupView() } label: {
+                    Label("截图记账快捷指令", systemImage: "camera.viewfinder")
+                }
+            }
         }
         .navigationTitle("设置")
         .navigationBarTitleDisplayMode(.inline)

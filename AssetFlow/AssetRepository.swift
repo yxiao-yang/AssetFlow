@@ -40,14 +40,16 @@ struct AssetPortfolio {
     func positions(_ account: AssetAccount) -> [StockHolding] { holdings.filter { $0.accountID == account.id } }
     func stockValue(_ account: AssetAccount) -> Int { positions(account).reduce(0) { $0 + $1.marketValue } }
     func stockCash(_ account: AssetAccount) -> Int { balance(account) - stockValue(account) }
-    var history: [AssetHistoryPoint] {
-        let now = Date()
-        let earliest = snapshots.map(\.date).min() ?? now
-        let start = max(earliest, Calendar.current.date(byAdding: .day, value: -90, to: now) ?? now)
-        let dates = engine.history(accountIDs: accounts.map(\.id), since: start, until: now).map(\.date)
-        return dates.compactMap { date in
+    var history: [AssetHistoryPoint] { history(in: .quarter) }
+    func history(in range: AssetHistoryRange, until now: Date = .now, calendar: Calendar = .current) -> [AssetHistoryPoint] {
+        let relevantIDs = Set(accounts.filter { $0.currencyCode == "CNY" }.map(\.id))
+        guard let earliest = snapshots.filter({ relevantIDs.contains($0.accountID) && $0.date <= now }).map(\.date).min() else { return [] }
+        let start = max(earliest, range.startDate(until: now, calendar: calendar) ?? earliest)
+        let balanceEngine = engine
+        let dates = balanceEngine.history(accountIDs: Array(relevantIDs), since: start, until: now, calendar: calendar).map(\.date)
+        return dates.map { date in
             let relevant = accounts.filter { $0.currencyCode == "CNY" && $0.createdAt <= date && ($0.archivedAt == nil || $0.archivedAt! > date) }
-            return AssetHistoryPoint(date: date, cents: relevant.reduce(0) { $0 + balance($1, at: date) })
+            return AssetHistoryPoint(date: date, cents: balanceEngine.total(accountIDs: relevant.map(\.id), at: date))
         }
     }
 

@@ -18,6 +18,8 @@
 
 ## 一次性配置截图记账
 
+可在 App 右上角「设置 → 截图记账快捷指令」查看完整引导，并跳转到系统快捷指令编辑器。创建动作和轻点背面绑定仍需在系统界面完成。
+
 先将 App 安装到 iPhone 并打开一次。在「快捷指令」中创建「截图记账」：
 
 1. 添加系统动作「截屏」（Take Screenshot）。
@@ -68,7 +70,7 @@ Debug 编译开启 `SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG` 后，可通过�
 
 ## 资产管理
 
-「资产」页展示折合人民币总资产、原币账户余额、类型占比和近 90 天趋势。示例数据只在 Debug 的独立内存模式中出现，不会进入个人账本。
+「资产」页展示折合人民币总资产、原币账户余额、类型占比和可选择 7 天、30 天、90 天、1 年（365 天）、全部的资产趋势。示例数据只在 Debug 的独立内存模式中出现，不会进入个人账本。
 
 - 账户类型简化为「资金账户、投资账户、现金、其他资产」，账户名称始终自定义。
 - 储蓄卡、存折、微信零钱、支付宝余额和余额宝统一按资金账户展示；旧记录的细分类在存储中保留，名称、余额和关联收支不变。
@@ -96,11 +98,11 @@ Debug 编译开启 `SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG` 后，可通过�
 ```sh
 xcrun swiftc AssetFlow/AssetMath.swift Tests/AssetMathChecks.swift -o /tmp/assetflow-asset-math
 /tmp/assetflow-asset-math
-xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/TermDepositMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetRepository.swift Tests/AssetIntegrationChecks.swift -o /tmp/assetflow-asset-integration
+xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/TermDepositMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetHistoryRange.swift AssetFlow/AssetRepository.swift Tests/AssetIntegrationChecks.swift -o /tmp/assetflow-asset-integration
 /tmp/assetflow-asset-integration
-xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/TermDepositMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetRepository.swift Tests/AccountUpdateChecks.swift -o /tmp/assetflow-account-updates
+xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/TermDepositMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetHistoryRange.swift AssetFlow/AssetRepository.swift Tests/AccountUpdateChecks.swift -o /tmp/assetflow-account-updates
 /tmp/assetflow-account-updates
-xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/TermDepositMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetRepository.swift Tests/CNYAccountDeletionChecks.swift -o /tmp/assetflow-account-deletion
+xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/TermDepositMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetHistoryRange.swift AssetFlow/AssetRepository.swift Tests/CNYAccountDeletionChecks.swift -o /tmp/assetflow-account-deletion
 /tmp/assetflow-account-deletion
 ```
 
@@ -120,8 +122,17 @@ xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/TermDep
 - 删除账户时同步清理定期明细，账本收支及其他账户的转账记录仍保留。
 
 ```sh
-xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/TermDepositMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetRepository.swift AssetFlow/TermDepositRepository.swift Tests/TermDepositChecks.swift -o /tmp/assetflow-term-checks
+xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/TermDepositMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetHistoryRange.swift AssetFlow/AssetRepository.swift AssetFlow/TermDepositRepository.swift Tests/TermDepositChecks.swift -o /tmp/assetflow-term-checks
 /tmp/assetflow-term-checks
 ```
 
 Debug 启动参数 `--demo-ledger --demo-term-deposits` 可查看独立内存中的多笔定期示例，不写入个人账本。
+
+资产趋势时间范围检查：
+
+```bash
+xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/TermDepositMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetHistoryRange.swift AssetFlow/AssetRepository.swift Tests/AssetHistoryRangeChecks.swift -o /tmp/assetflow-history-checks
+/tmp/assetflow-history-checks
+```
+
+覆盖五档范围、历史起点、人民币账户过滤、当日收支和空数据。快捷指令创建跳转、轻点背面与真实支付截图识别仍需真机验证。
