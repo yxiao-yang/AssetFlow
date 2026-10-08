@@ -71,7 +71,7 @@ struct ContentView: View {
                     .onDelete(perform: delete)
                 }
             }
-            .navigationTitle("我的账本")
+            .navigationTitle("资产流")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("记一笔", systemImage: "plus") { showingEntry = true }
