@@ -2,7 +2,6 @@ import SwiftUI
 
 struct LedgerListView: View {
     @Binding var month: Date
-    @Binding var search: String
     @Binding var hidden: Bool
     @Binding var selectedCategory: String?
     @Binding var selectedDay: Date?
@@ -16,9 +15,7 @@ struct LedgerListView: View {
         records.filter { row in
             (selectedCategory == nil || row.category == selectedCategory) &&
             (selectedDay == nil || Calendar.current.isDate(row.date, inSameDayAs: selectedDay!)) &&
-            (type == "全部" || row.isIncome == (type == "收入")) &&
-            (search.isEmpty || [row.category, row.note, row.merchant ?? "", row.paymentMethod ?? ""]
-                .contains { $0.localizedCaseInsensitiveContains(search) })
+            (type == "全部" || row.isIncome == (type == "收入"))
         }
     }
     private var dates: [Date] {
@@ -66,7 +63,7 @@ struct LedgerListView: View {
             }.listRowSeparator(.hidden)
             if filtered.isEmpty {
                 Section {
-                    ContentUnavailableView(search.isEmpty ? "这个范围还没有记录" : "没有匹配的记录",
+                    ContentUnavailableView("这个范围还没有记录",
                         systemImage: "doc.text.magnifyingglass",
                         description: Text("切换月份或筛选条件，也可以记下第一笔。"))
                     Button("记一笔", action: add).frame(maxWidth: .infinity)
@@ -90,7 +87,6 @@ struct LedgerListView: View {
         .listSectionSpacing(14)
         .navigationTitle("资产流")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $search, prompt: "搜索商户、备注、分类")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { hidden.toggle() } label: { Image(systemName: hidden ? "eye.slash" : "eye") }
@@ -114,8 +110,6 @@ struct LedgerListView: View {
             .padding(.horizontal, 20).padding(.vertical, 8)
             .background(.regularMaterial)
         }
-        .onChange(of: selectedCategory) { _, _ in search = "" }
-        .onChange(of: selectedDay) { _, _ in search = "" }
     }
 
     private var summary: some View {
@@ -158,7 +152,7 @@ struct LedgerListView: View {
             }.font(.caption)
         }.textCase(nil)
     }
-    private func clearFilters() { selectedCategory = nil; selectedDay = nil; type = "全部"; search = "" }
+    private func clearFilters() { selectedCategory = nil; selectedDay = nil; type = "全部" }
 }
 
 struct LedgerRow: View {
