@@ -11,10 +11,16 @@ struct ExpenseEntryView: View {
     @State private var date = Date()
     @State private var errorMessage: String?
     @FocusState private var amountFocused: Bool
+    @Query(sort: \AssetAccount.createdAt) private var accounts: [AssetAccount]
+    @State private var accountID: UUID?
+    private var eligibleAccounts: [AssetAccount] {
+        accounts.filter { $0.archivedAt == nil && $0.currencyCode == "CNY" && $0.kind != .stocks }
+    }
     private let existing: Expense?
 
     init(existing: Expense? = nil) {
         self.existing = existing
+        _accountID = State(initialValue: existing?.accountID)
         _isIncome = State(initialValue: existing?.isIncome ?? false)
         _amount = State(initialValue: existing.map {
             $0.amountInCents > 0 ? NSDecimalNumber(decimal: Decimal($0.amountInCents) / 100).stringValue : ""
@@ -60,12 +66,18 @@ struct ExpenseEntryView: View {
                     Picker("分类", selection: $category) {
                         ForEach(categories, id: \.self) { Text($0) }
                     }
+                    Picker("关联资产账户", selection: $accountID) {
+                        Text("不关联账户").tag(nil as UUID?)
+                        ForEach(eligibleAccounts) { Text($0.name).tag(Optional($0.id)) }
+                    }
+                    Text("关联人民币账户后更新余额；早于最近余额核对的记录不会再重复扣款。")
+                        .font(.caption).foregroundStyle(.secondary)
                     DatePicker("日期", selection: $date, in: ...Date(), displayedComponents: .date)
                     TextField("备注（选填）", text: $note)
                     if let existing, existing.needsConfirmation {
                         Text(existing.reviewReason ?? "请核对")
                             .font(.footnote).foregroundStyle(.orange)
-                        Text("请核对金额、时间和收支类型。退款、转账、充值和还款尚未支持，请勿作为普通收支入账。")
+                        Text("请核对金额、时间和收支类型。自己的账户间转账请在资产页记录；退款、充值和还款请勿直接确认为普通消费。")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
@@ -96,6 +108,7 @@ struct ExpenseEntryView: View {
     private func save() {
         guard let cents else { return }
         let expense = existing ?? Expense(amountInCents: cents, category: category, note: "", date: date)
+        expense.accountID = accountID
         expense.isIncome = isIncome
         expense.amountInCents = cents
         expense.category = category
@@ -118,6 +131,7 @@ struct ExpenseEntryView: View {
 struct ExpenseDetailView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Query private var accounts: [AssetAccount]
     let expense: Expense
     @State private var editing = false
     @State private var deleting = false
@@ -126,6 +140,9 @@ struct ExpenseDetailView: View {
     var body: some View {
         List {
             Section("记录") {
+                if let account = accounts.first(where: { $0.id == expense.accountID }) {
+                    LabeledContent("资产账户", value: account.name)
+                }
                 LabeledContent("类型", value: expense.isIncome ? "收入" : "支出")
                 LabeledContent("金额", value: expense.amountInCents > 0 ? money(expense.amountInCents) : "未识别")
                 LabeledContent("分类（可修改）", value: expense.category)
@@ -142,7 +159,7 @@ struct ExpenseDetailView: View {
                     LabeledContent("支付渠道", value: expense.paymentChannel ?? "未识别")
                     LabeledContent("扣款方式", value: expense.paymentMethod ?? "未识别")
                     LabeledContent("交易单号", value: expense.transactionID ?? "未识别")
-                    Text("扣款方式为截图原文，尚未关联资产账户。")
+                    Text("明确匹配的账户会自动关联；也可在编辑记录中手动选择。")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 Section("原始截图") {

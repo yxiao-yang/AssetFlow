@@ -4,22 +4,6 @@ import Foundation
 import SwiftData
 import Vision
 
-@MainActor
-enum AssetStore {
-    static let container: ModelContainer = {
-        do {
-            #if DEBUG
-            if CommandLine.arguments.contains("--demo-ledger") {
-                let container = try ModelContainer(for: Expense.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
-                LedgerDemo.seed(container.mainContext)
-                return container
-            }
-            #endif
-            return try ModelContainer(for: Expense.self)
-        }
-        catch { fatalError("无法打开本地账本：\(error.localizedDescription)") }
-    }()
-}
 
 struct PaymentOCR {
     static func recognize(_ data: Data) throws -> (text: String, confidence: Float) {
@@ -75,6 +59,8 @@ struct RecordPaymentScreenshotIntent: AppIntent {
         }
         let expense = Expense(amountInCents: payment.amountInCents ?? 0,
             category: payment.category, note: payment.merchant ?? "截图记账", date: payment.date ?? .now)
+        let accounts = try context.fetch(FetchDescriptor<AssetAccount>())
+        expense.accountID = AssetRepository.matchingAccount(method: payment.paymentMethod, in: accounts)?.id
         expense.merchant = payment.merchant
         expense.paymentChannel = payment.paymentChannel
         expense.paymentMethod = payment.paymentMethod

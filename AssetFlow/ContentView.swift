@@ -14,7 +14,8 @@ struct ContentView: View {
     init() {
         #if DEBUG
         _tab = State(initialValue: CommandLine.arguments.contains("--demo-charts") ? 1 :
-            CommandLine.arguments.contains("--demo-calendar") ? 2 : 0)
+            CommandLine.arguments.contains("--demo-calendar") ? 2 :
+            CommandLine.arguments.contains("--demo-assets") ? 3 : 0)
         #endif
     }
 
@@ -48,6 +49,8 @@ struct ContentView: View {
                 }
             }
             .tabItem { Label("日历", systemImage: "calendar") }.tag(2)
+            NavigationStack { AssetOverview() }
+                .tabItem { Label("资产", systemImage: "wallet.pass") }.tag(3)
         }
         .tint(LedgerStyle.accent)
         .environment(\.locale, Locale(identifier: "zh_CN"))
@@ -57,5 +60,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView().modelContainer(for: Expense.self, inMemory: true)
+    ContentView().modelContainer(for: [Expense.self, AssetAccount.self, AssetBalanceSnapshot.self, StockHolding.self, AssetTransfer.self, AssetFXRate.self], inMemory: true)
 }

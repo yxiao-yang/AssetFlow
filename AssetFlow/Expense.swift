@@ -8,6 +8,7 @@ final class Expense {
     var category: String
     var note: String
     var date: Date
+    var accountID: UUID?
     var merchant: String?
     var paymentChannel: String?
     var paymentMethod: String?
