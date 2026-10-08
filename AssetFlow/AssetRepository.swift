@@ -7,9 +7,8 @@ struct AssetPortfolio {
     let holdings: [StockHolding]
     let transfers: [AssetTransfer]
     let expenses: [Expense]
-    let rates: [AssetFXRate]
 
-    var activeAccounts: [AssetAccount] { accounts.filter { $0.archivedAt == nil } }
+    var activeAccounts: [AssetAccount] { accounts.filter { $0.archivedAt == nil && $0.currencyCode == "CNY" } }
     var engine: AssetBalanceEngine {
         let flow = expenses.filter { !$0.needsConfirmation && $0.accountID != nil }.map {
             AssetMovement(accountID: $0.accountID!, cents: $0.isIncome ? $0.amountInCents : -$0.amountInCents, date: $0.date)
@@ -24,20 +23,7 @@ struct AssetPortfolio {
     func balance(_ account: AssetAccount, at date: Date = .now) -> Int {
         engine.value(accountID: account.id, at: date) ?? 0
     }
-    func rate(at date: Date = .now) -> Decimal? {
-        rates.filter { $0.date <= date }.max(by: { $0.date < $1.date }).flatMap { AssetMath.exchangeRate($0.rateText) }
-    }
-    func converted(_ account: AssetAccount, at date: Date = .now) -> Int? {
-        let value = balance(account, at: date)
-        if account.currencyCode == "CNY" { return value }
-        guard let rate = rate(at: date) else { return nil }
-        return AssetMath.convert(value, rate: rate)
-    }
-    var total: Int? {
-        let values = activeAccounts.map { converted($0) }
-        guard values.allSatisfy({ $0 != nil }) else { return nil }
-        return values.reduce(0) { $0 + ($1 ?? 0) }
-    }
+    var total: Int { activeAccounts.reduce(0) { $0 + balance($1) } }
     func lastUpdateDate(_ account: AssetAccount) -> Date {
         max(account.updatedAt ?? account.createdAt,
             snapshots.filter { $0.accountID == account.id }.map(\.date).max() ?? account.createdAt)
@@ -51,10 +37,8 @@ struct AssetPortfolio {
         let start = max(earliest, Calendar.current.date(byAdding: .day, value: -90, to: now) ?? now)
         let dates = engine.history(accountIDs: accounts.map(\.id), since: start, until: now).map(\.date)
         return dates.compactMap { date in
-            let relevant = accounts.filter { $0.createdAt <= date && ($0.archivedAt == nil || $0.archivedAt! > date) }
-            let values = relevant.map { converted($0, at: date) }
-            guard values.allSatisfy({ $0 != nil }) else { return nil }
-            return AssetHistoryPoint(date: date, cents: values.reduce(0) { $0 + ($1 ?? 0) })
+            let relevant = accounts.filter { $0.currencyCode == "CNY" && $0.createdAt <= date && ($0.archivedAt == nil || $0.archivedAt! > date) }
+            return AssetHistoryPoint(date: date, cents: relevant.reduce(0) { $0 + balance($1, at: date) })
         }
     }
 
@@ -67,8 +51,21 @@ enum AssetRepository {
             snapshots: try context.fetch(FetchDescriptor<AssetBalanceSnapshot>()),
             holdings: try context.fetch(FetchDescriptor<StockHolding>()),
             transfers: try context.fetch(FetchDescriptor<AssetTransfer>()),
-            expenses: try context.fetch(FetchDescriptor<Expense>()),
-            rates: try context.fetch(FetchDescriptor<AssetFXRate>()))
+            expenses: try context.fetch(FetchDescriptor<Expense>()))
+    }
+    static func deleteAccount(_ account: AssetAccount, in context: ModelContext) throws {
+        do {
+            let portfolio = try fetch(context)
+            for expense in portfolio.expenses where expense.accountID == account.id { expense.accountID = nil }
+            for snapshot in portfolio.snapshots where snapshot.accountID == account.id { context.delete(snapshot) }
+            for holding in portfolio.holdings where holding.accountID == account.id { context.delete(holding) }
+            // Retain transfers: removing them would change balances and history in the surviving accounts.
+            context.delete(account)
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
+        }
     }
     static func matchingAccount(method: String?, in accounts: [AssetAccount]) -> AssetAccount? {
         guard let method, !method.isEmpty else { return nil }

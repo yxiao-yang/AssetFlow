@@ -7,7 +7,6 @@ struct AssetAccountEditor: View {
     private let existing: AssetAccount?
     @State private var name: String
     @State private var kind: AssetKind
-    @State private var currency: String
     @State private var institution: String
     @State private var lastFour: String
     @State private var note: String
@@ -27,7 +26,6 @@ struct AssetAccountEditor: View {
         self.existing = existing
         _name = State(initialValue: existing?.name ?? "")
         _kind = State(initialValue: existing?.kind.category ?? .funds)
-        _currency = State(initialValue: existing?.currencyCode ?? "CNY")
         _institution = State(initialValue: existing?.institution ?? "")
         _lastFour = State(initialValue: existing?.lastFour ?? "")
         _note = State(initialValue: existing?.note ?? "")
@@ -48,10 +46,6 @@ struct AssetAccountEditor: View {
                     TextField("自定义名称，如 工资卡、微信零钱", text: $name)
                     Picker("类型", selection: $kind) {
                         ForEach(AssetKind.selectable) { Text($0.title).tag($0) }
-                    }.disabled(existing != nil)
-                    Picker("币种", selection: $currency) {
-                        Text("人民币 CNY").tag("CNY")
-                        Text("港币 HKD").tag("HKD")
                     }.disabled(existing != nil)
                     TextField("银行／券商／机构（选填）", text: $institution)
                     if kind == .funds {
@@ -98,9 +92,6 @@ struct AssetAccountEditor: View {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("保存", action: save).disabled(!valid) }
             }
-            .onChange(of: kind) { _, value in
-                if existing == nil { currency = value == .stocks ? "HKD" : "CNY" }
-            }
             .alert("保存失败，请重试", isPresented: $failed) { Button("好", role: .cancel) {} }
         }
     }
@@ -114,7 +105,7 @@ struct AssetAccountEditor: View {
         if existing != nil { account.recordUpdate(previousDate: lastUpdate) }
         if existing == nil {
             account.updatedAt = account.createdAt
-            account.currencyCode = currency
+            account.currencyCode = "CNY"
             context.insert(account)
             context.insert(AssetBalanceSnapshot(accountID: account.id, amountInCents: AssetMath.cents(balance)!,
                 date: account.createdAt, note: kind == .stocks ? "录入可用现金" : "期初余额"))
@@ -141,7 +132,7 @@ struct AssetBalanceEditor: View {
                 Section {
                     LabeledContent("上次更新时间", value: lastUpdate.formatted(date: .numeric, time: .shortened))
                 }
-                Section(account.kind == .stocks ? "当前可用现金 · \(account.currencyCode)" : "当前账户余额 · \(account.currencyCode)") {
+                Section(account.kind == .stocks ? "当前可用现金 · 人民币" : "当前账户余额 · 人民币") {
                     TextField("输入核对后的金额", text: $amount).keyboardType(.decimalPad)
                     TextField("核对说明（选填）", text: $note)
                     Text("此次核对会更新当前余额并保留旧记录，不会记作收入或支出。")
@@ -165,64 +156,5 @@ struct AssetBalanceEditor: View {
                 note: note.isEmpty ? "余额核对" : note))
             try context.save(); dismiss()
         } catch { context.rollback(); failed = true }
-    }
-}
-
-struct AssetRateEditor: View {
-    @Environment(\.modelContext) private var context
-    @Environment(\.dismiss) private var dismiss
-    @State private var rate = ""
-    @State private var failed = false
-    @State private var fetching = false
-    @State private var fetchedRate: String?
-    @State private var marketDate: String?
-    @State private var source = "手动录入"
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("1 港币折合多少人民币") {
-                    TextField("输入 HKD → CNY 汇率", text: $rate).keyboardType(.decimalPad)
-                        .onChange(of: rate) { _, value in
-                            if value != fetchedRate { source = "手动录入"; marketDate = nil }
-                        }
-                    Button(fetching ? "正在获取…" : "获取最新参考汇率") {
-                        Task { await fetch() }
-                    }.disabled(fetching)
-                    if let marketDate { Text("参考汇率日期：" + marketDate).font(.caption).foregroundStyle(.secondary) }
-                    Text("参考汇率按日更新，不是实时换汇成交价。来源：Frankfurter。")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Text("不会改动港币账户原始金额，历史换算保留当时记录的汇率。")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }.navigationTitle("换算汇率").navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") {
-                        let saved = AssetFXRate(rateText: rate, source: source)
-                        saved.marketDate = marketDate
-                        context.insert(saved)
-                        do { try context.save(); dismiss() } catch { context.rollback(); failed = true }
-                    }.disabled(AssetMath.exchangeRate(rate) == nil)
-                }
-            }
-            .alert("操作未完成，请重试或手动设置汇率", isPresented: $failed) { Button("好", role: .cancel) {} }
-        }
-    }
-    @MainActor
-    private func fetch() async {
-        fetching = true
-        defer { fetching = false }
-        do {
-            let fetched = try await AssetFXClient.fetchHKD()
-            var raw = fetched.rate
-            var rounded = Decimal()
-            NSDecimalRound(&rounded, &raw, 8, .plain)
-            let text = NSDecimalNumber(decimal: rounded).stringValue
-            fetchedRate = text
-            rate = text
-            marketDate = fetched.date
-            source = "Frankfurter 每日参考汇率"
-        } catch { failed = true }
     }
 }

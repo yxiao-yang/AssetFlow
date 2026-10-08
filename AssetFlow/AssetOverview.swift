@@ -8,22 +8,20 @@ struct AssetOverview: View {
     @Query private var holdings: [StockHolding]
     @Query private var transfers: [AssetTransfer]
     @Query private var expenses: [Expense]
-    @Query private var rates: [AssetFXRate]
     @AppStorage("hideLedgerAmounts") private var hidden = false
     @State private var creating = false
     @State private var transferring = false
-    @State private var editingRate = false
 
     private var portfolio: AssetPortfolio {
         AssetPortfolio(accounts: accounts, snapshots: snapshots, holdings: holdings,
-            transfers: transfers, expenses: expenses, rates: rates)
+            transfers: transfers, expenses: expenses)
     }
     private var sorted: [AssetAccount] {
-        portfolio.activeAccounts.sorted { (portfolio.converted($0) ?? 0) > (portfolio.converted($1) ?? 0) }
+        portfolio.activeAccounts.sorted { portfolio.balance($0) > portfolio.balance($1) }
     }
     private var composition: [(kind: AssetKind, value: Int)] {
         AssetKind.selectable.compactMap { kind in
-            let value = sorted.filter { $0.kind.category == kind }.reduce(0) { $0 + max(0, portfolio.converted($1) ?? 0) }
+            let value = sorted.filter { $0.kind.category == kind }.reduce(0) { $0 + max(0, portfolio.balance($1)) }
             return value > 0 ? (kind, value) : nil
         }.sorted { $0.value > $1.value }
     }
@@ -33,14 +31,14 @@ struct AssetOverview: View {
             Section {
                 VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("总资产 · 折合人民币").font(.subheadline).foregroundStyle(.secondary)
-                        Text(portfolio.total.map { assetMoney($0, hidden: hidden) } ?? "待设置汇率")
+                        Text("总资产 · 人民币").font(.subheadline).foregroundStyle(.secondary)
+                        Text(assetMoney(portfolio.total, hidden: hidden))
                             .font(.system(.largeTitle, design: .rounded).weight(.bold))
                             .lineLimit(1).minimumScaleFactor(0.5)
                         HStack {
                             Label("\(sorted.count) 个账户", systemImage: "square.stack")
                             Spacer()
-                            Text("\(holdings.count) 只持仓")
+                            Text("\(holdings.filter { holding in sorted.contains { $0.id == holding.accountID } }.count) 只持仓")
                         }.font(.caption).foregroundStyle(.secondary)
                     }.padding(.vertical, 8)
                     HStack {
@@ -49,20 +47,7 @@ struct AssetOverview: View {
                         Button { transferring = true } label: { Label("账户转账", systemImage: "arrow.left.arrow.right") }
                             .disabled(sorted.count < 2)
                     }.font(.subheadline).buttonStyle(.borderless)
-                    if sorted.contains(where: { $0.currencyCode == "HKD" }) {
-                        Button { editingRate = true } label: {
-                            HStack {
-                                Text("港币换算汇率")
-                                Spacer()
-                                Text(portfolio.rate().map { "1 HKD = " + NSDecimalNumber(decimal: $0).stringValue + " CNY" } ?? "点击设置")
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                        }.buttonStyle(.plain)
-                        if let latest = rates.max(by: { $0.date < $1.date }) {
-                            Text(latest.source + (latest.marketDate.map { " · " + $0 } ?? ""))
-                                .font(.caption2).foregroundStyle(.secondary)
-                        }
-                    }
+
                 }
             }.listRowSeparator(.hidden)
             if sorted.isEmpty {
@@ -85,12 +70,10 @@ struct AssetOverview: View {
                                     }
                                     Spacer()
                                     VStack(alignment: .trailing, spacing: 5) {
-                                        Text(assetMoney(portfolio.balance(account), currency: account.currencyCode, hidden: hidden))
+                                        Text(assetMoney(portfolio.balance(account), hidden: hidden))
                                             .font(.subheadline.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.5)
                                             .foregroundStyle(portfolio.balance(account) < 0 ? .red : .primary)
-                                        if account.currencyCode == "HKD", let value = portfolio.converted(account) {
-                                            Text("≈ " + assetMoney(value, hidden: hidden)).font(.caption2).foregroundStyle(.secondary)
-                                        }
+
                                     }
                                 }
                                 Text("上次更新时间 " + portfolio.lastUpdateDate(account).formatted(date: .numeric, time: .shortened))
@@ -99,7 +82,7 @@ struct AssetOverview: View {
                         }
                     }
                 }
-                if !hidden, portfolio.total != nil, !composition.isEmpty {
+                if !hidden, !composition.isEmpty {
                     Section("资产分布") {
                         Chart(Array(composition.enumerated()), id: \.offset) { _, item in
                             SectorMark(angle: .value("资产", Double(item.value) / 100), innerRadius: .ratio(0.72), angularInset: 2)
@@ -162,6 +145,5 @@ struct AssetOverview: View {
         }
         .sheet(isPresented: $creating) { AssetAccountEditor() }
         .sheet(isPresented: $transferring) { AssetTransferEditor() }
-        .sheet(isPresented: $editingRate) { AssetRateEditor() }
     }
 }

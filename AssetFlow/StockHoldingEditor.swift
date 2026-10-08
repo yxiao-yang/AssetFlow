@@ -24,9 +24,8 @@ struct StockHoldingEditor: View {
     }
     private var code: String? {
         let value = symbol.trimmingCharacters(in: .whitespacesAndNewlines)
-        let pattern = account.currencyCode == "HKD" ? #"^[0-9]{1,5}$"# : #"^[0-9]{6}$"#
-        guard value.range(of: pattern, options: .regularExpression) != nil else { return nil }
-        return account.currencyCode == "HKD" ? String(repeating: "0", count: 5 - value.count) + value : value
+        guard value.range(of: #"^[0-9]{1,6}$"#, options: .regularExpression) != nil else { return nil }
+        return value.count < 5 ? String(repeating: "0", count: 5 - value.count) + value : value
     }
     private var valid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && code != nil &&
@@ -37,21 +36,21 @@ struct StockHoldingEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("持仓信息 · \(account.currencyCode)") {
+                Section("持仓信息 · 人民币") {
                     TextField("股票名称", text: $name)
-                    TextField(account.currencyCode == "HKD" ? "港股代码，如 00700" : "股票代码，6 位", text: $symbol)
+                    TextField("股票代码，如 00700、600000", text: $symbol)
                         .keyboardType(.numberPad)
                     TextField("持仓数量（股）", text: $quantity).keyboardType(.decimalPad)
                     TextField("成交均价／成本价（每股）", text: $cost).keyboardType(.decimalPad)
                     TextField("当前参考价（每股，手动）", text: $price).keyboardType(.decimalPad)
-                    Text("价格最多 4 位小数，数量最多 6 位小数。单笔买入可填成交价；多笔买入请填平均成本价，可使用券商显示的含费用成本。")
+                    Text("价格最多 4 位小数，数量最多 6 位小数。全部价格使用人民币。单笔买入填成交价，多笔买入填平均成本价。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if valid {
                     Section("持仓预览") {
-                        LabeledContent("市值", value: assetMoney(AssetMath.positionValue(quantity, priceText: price)!, currency: account.currencyCode))
-                        LabeledContent("成本", value: assetMoney(AssetMath.positionValue(quantity, priceText: cost)!, currency: account.currencyCode))
-                        LabeledContent("浮动盈亏", value: assetMoney(AssetMath.positionValue(quantity, priceText: price)! - AssetMath.positionValue(quantity, priceText: cost)!, currency: account.currencyCode))
+                        LabeledContent("市值", value: assetMoney(AssetMath.positionValue(quantity, priceText: price)!, currency: "CNY"))
+                        LabeledContent("成本", value: assetMoney(AssetMath.positionValue(quantity, priceText: cost)!, currency: "CNY"))
+                        LabeledContent("浮动盈亏", value: assetMoney(AssetMath.positionValue(quantity, priceText: price)! - AssetMath.positionValue(quantity, priceText: cost)!, currency: "CNY"))
                     }
                 }
                 Section {
@@ -116,16 +115,13 @@ struct AssetTransferEditor: View {
     @State private var fromID: UUID?
     @State private var toID: UUID?
     @State private var amount = ""
-    @State private var received = ""
     @State private var note = ""
     @State private var error: String?
-    private var active: [AssetAccount] { accounts.filter { $0.archivedAt == nil } }
+    private var active: [AssetAccount] { accounts.filter { $0.archivedAt == nil && $0.currencyCode == "CNY" } }
     private var from: AssetAccount? { active.first { $0.id == fromID } }
     private var to: AssetAccount? { active.first { $0.id == toID } }
-    private var crossCurrency: Bool { from != nil && to != nil && from!.currencyCode != to!.currencyCode }
     private var valid: Bool {
-        from != nil && to != nil && fromID != toID && AssetMath.cents(amount, allowZero: false) != nil &&
-        (!crossCurrency || AssetMath.cents(received, allowZero: false) != nil)
+        from != nil && to != nil && fromID != toID && AssetMath.cents(amount, allowZero: false) != nil
     }
     var body: some View {
         NavigationStack {
@@ -133,18 +129,17 @@ struct AssetTransferEditor: View {
                 Section("转账账户") {
                     Picker("转出", selection: $fromID) {
                         Text("请选择").tag(nil as UUID?)
-                        ForEach(active) { Text($0.name + " · " + $0.currencyCode).tag(Optional($0.id)) }
+                        ForEach(active) { Text($0.name).tag(Optional($0.id)) }
                     }
                     Picker("转入", selection: $toID) {
                         Text("请选择").tag(nil as UUID?)
-                        ForEach(active.filter { $0.id != fromID }) { Text($0.name + " · " + $0.currencyCode).tag(Optional($0.id)) }
+                        ForEach(active.filter { $0.id != fromID }) { Text($0.name).tag(Optional($0.id)) }
                     }
                 }
                 Section("实际到账金额") {
-                    TextField("转出金额 · " + (from?.currencyCode ?? ""), text: $amount).keyboardType(.decimalPad)
-                    if crossCurrency { TextField("实际转入金额 · " + (to?.currencyCode ?? ""), text: $received).keyboardType(.decimalPad) }
+                    TextField("转账金额（人民币）", text: $amount).keyboardType(.decimalPad)
                     TextField("备注（选填）", text: $note)
-                    Text("转账不计入日常收支。跨币种分别填写实际扣款与到账金额；证券账户仅转入、转出可用现金。")
+                    Text("转账不计入日常收支。证券账户仅转入、转出可用现金。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }.navigationTitle("账户间转账").navigationBarTitleDisplayMode(.inline)
@@ -165,7 +160,7 @@ struct AssetTransferEditor: View {
             let available = from.kind == .stocks ? portfolio.stockCash(from) : portfolio.balance(from)
             guard available >= cents else { error = "转出金额超过已记录的可用余额，请先核对账户。"; return }
             context.insert(AssetTransfer(fromID: from.id, toID: to.id, amountInCents: cents,
-                receivedInCents: crossCurrency ? AssetMath.cents(received)! : cents, note: note))
+                receivedInCents: cents, note: note))
             try context.save(); dismiss()
         } catch { context.rollback(); self.error = "转账记录未能保存，请重试。" }
     }

@@ -1,6 +1,6 @@
 # AssetFlow · 资产流
 
-个人资产管理与记账 iOS App。支持收支记账、快捷指令支付截图识别，以及人民币和港币资产管理。
+个人资产管理与记账 iOS App。支持收支记账、快捷指令支付截图识别，以及人民币资产管理。
 
 ## 运行
 
@@ -75,8 +75,8 @@ Debug 编译开启 `SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG` 后，可通过�
 - 资金账户可填写机构、尾号和备注，在折叠的「存款／收益信息」中选填收益率参考及到期日。
 - 投资账户：现金和股票市值分开，合计计入资产；逐只股票手动记录名称、代码、数量、成交均价／成本价和当前参考价，展示市值、成本、浮动盈亏与盈亏率。
 - 列表、详情、编辑资料及余额核对页面显示「上次更新时间」。编辑账户资料、核对余额和更新持仓时保存新时间，并保留「前次更新时间」；收支和转账不会覆盖手动更新时间。旧账户从已有余额快照或创建时间恢复显示，不能据此认为外部余额已实时同步。
-- 港股用 HKD 展示。设置 HKD → CNY 汇率后才汇总到人民币；未设置时提示补充汇率，不把两种币种直接相加。
-- 汇率可手动填写，也可获取 [Frankfurter 每日参考汇率](https://frankfurter.dev/)。显示来源与参考日期；它不是实时换汇成交价。
+- 所有新账户、股票价格和转账金额均以人民币记录，不再提供币种选择或汇率换算。旧外币账户、持仓及汇率数据留存在本地，仅用于兼容已有数据，不参与资产展示、账户选择或人民币统计，不自动将原币金额改成人民币。
+- 在账户详情右上角或底部点击「删除账户」，确认后删除账户、持仓和余额核对记录。账本收支保留并解除账户关联；涉及该账户的转账保留在其他账户中，避免改变其他账户的余额，对方显示「已删除账户」。删除后的账户不再参与当前或历史资产统计。
 - 股票价格当前手动核对，明确标记来源和价格时间。初版采用全手动录入，暂不接入行情服务。单笔买入填成交价，多笔买入填平均成本价；当前参考价用于估算市值和浮动盈亏。
 
 ### 录入和日常使用
@@ -85,9 +85,9 @@ Debug 编译开启 `SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG` 后，可通过�
 
 收支可关联人民币非证券账户。只有最近一次余额核对之后的已确认收支会改变余额，避免已包含在当前余额中的历史账单再次扣款。待确认记录不改变余额。未关联的记录继续参与账本统计，资产页列出这些记录以便补充关联。
 
-自己账户之间移动资金请使用「账户转账」，不会计为收入或支出。同币种转账保持总资产不变，跨币种分别填实际转出和到账金额；证券转出只能使用记录的可用现金。手续费可单独记录支出。
+自己账户之间移动资金请使用「账户转账」，不会计为收入或支出。人民币账户间转账保持总资产不变；证券转出只能使用记录的可用现金。手续费可单独记录支出。
 
-「核对当前余额」保存新的余额快照，不作为收入。持仓核对保存新的证券估值并保留此前历史，不会自动执行买卖或调整现金；数量变化后需核对券商现金。历史趋势从首次录入开始，不补造更早的余额；变化包含新增账户、核对和汇率变化，不能等同投资收益。
+「核对当前余额」保存新的余额快照，不作为收入。持仓核对保存新的证券估值并保留此前历史，不会自动执行买卖或调整现金；数量变化后需核对券商现金。历史趋势从首次录入开始，不补造更早的余额；变化包含新增账户、删除账户和核对，不能等同投资收益。
 
 目前不包含负债管理、券商交易流水、分红自动同步、银行直连或自动同步余额。
 
@@ -100,6 +100,8 @@ xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/AssetMo
 /tmp/assetflow-asset-integration
 xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetRepository.swift Tests/AccountUpdateChecks.swift -o /tmp/assetflow-account-updates
 /tmp/assetflow-account-updates
+xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetRepository.swift Tests/CNYAccountDeletionChecks.swift -o /tmp/assetflow-account-deletion
+/tmp/assetflow-account-deletion
 ```
 
-覆盖金额与估值精度、余额快照边界、待确认收支排除、转账、截图账户匹配、港币换算和证券现金。Debug 启动参数 `--demo-ledger --demo-assets` 打开独立内存示例资产页面。
+覆盖金额与估值精度、余额快照边界、待确认收支排除、转账、截图账户匹配、旧外币排除和证券现金。Debug 启动参数 `--demo-ledger --demo-assets` 打开独立内存示例资产页面。
