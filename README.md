@@ -7,6 +7,15 @@
 用 Xcode 打开 `AssetFlow.xcodeproj`，选择 iPhone 模拟器，按 Command + R。
 最低 iOS 17。真机运行时，在 Signing & Capabilities 中选择自己的开发团队。
 
+## 日常账本
+
+- 明细：月度支出、收入、结余和笔数；切换月份；按天分组；商户、分类、扣款方式和时间；搜索与收支筛选。
+- 图表：分类环形图、每日收支柱状图、分类排行及占比。点击排行进入对应月份、分类和收支类型的明细。
+- 日历：每天的收入和支出，点击日期查看当天流水。
+- 可手动录入和编辑收入、支出。待确认截图独立展示，排除在全部统计之外。
+- 明细页的眼睛按钮隐藏金额；金额隐藏时图表也隐藏。
+- 以上为 AssetFlow 当前功能，不代表完整实现 iCost 的账户、预算、退款等功能。
+
 ## 一次性配置截图记账
 
 先将 App 安装到 iPhone 并打开一次。在「快捷指令」中创建「截图记账」：
@@ -33,7 +42,7 @@
 
 ## 数据
 
-SwiftUI + SwiftData；金额以整数分保存。新增字段使用默认值或可选值，以支持旧记录的轻量迁移；迁移与快捷指令完整流程仍需真机验证。尚未实现收入、转账、资产账户、备份或云同步。
+SwiftUI + SwiftData；金额以整数分保存。新增字段使用默认值或可选值，以支持旧记录的轻量迁移；迁移与快捷指令完整流程仍需真机验证。尚未实现转账、资产账户、备份或云同步。
 
 ## 解析规则检查
 
@@ -45,3 +54,14 @@ xcrun swiftc AssetFlow/PaymentParser.swift Tests/PaymentParserChecks.swift -o /t
 ```
 
 检查金额精度、多金额歧义、折扣排除、退款、转账和外币处理。OCR 及快捷指令还需真实账单截图验证。
+
+
+## 统计检查
+
+```sh
+xcrun swiftc AssetFlow/LedgerAnalytics.swift Tests/LedgerAnalyticsChecks.swift -o /tmp/assetflow-analytics-checks
+/tmp/assetflow-analytics-checks
+```
+
+包含收入、支出、结余、分类排行、月份边界、不同月份天数和待确认记录排除。
+Debug 编译开启 `SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG` 后，可通过启动参数 `--demo-ledger` 使用独立内存示例；附加 `--demo-charts` 或 `--demo-calendar` 打开对应页面。示例不写入真实账本，正式构建不包含示例逻辑。

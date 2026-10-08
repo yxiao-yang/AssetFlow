@@ -7,7 +7,16 @@ import Vision
 @MainActor
 enum AssetStore {
     static let container: ModelContainer = {
-        do { return try ModelContainer(for: Expense.self) }
+        do {
+            #if DEBUG
+            if CommandLine.arguments.contains("--demo-ledger") {
+                let container = try ModelContainer(for: Expense.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+                LedgerDemo.seed(container.mainContext)
+                return container
+            }
+            #endif
+            return try ModelContainer(for: Expense.self)
+        }
         catch { fatalError("无法打开本地账本：\(error.localizedDescription)") }
     }()
 }
