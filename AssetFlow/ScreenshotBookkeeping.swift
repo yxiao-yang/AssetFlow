@@ -12,9 +12,12 @@ struct PaymentOCR {
         request.recognitionLanguages = ["zh-Hans", "en-US"]
         request.usesLanguageCorrection = true
         try VNImageRequestHandler(data: data).perform([request])
-        let candidates = (request.results ?? []).compactMap { $0.topCandidates(1).first }
-        guard !candidates.isEmpty else { throw ScreenshotError.noText }
-        return (candidates.map(\.string).joined(separator: "\n"), candidates.map(\.confidence).min() ?? 0)
+        let lines = (request.results ?? []).compactMap { observation -> PaymentOCRLine? in
+            guard let candidate = observation.topCandidates(1).first else { return nil }
+            return PaymentOCRLine(text: candidate.string, confidence: candidate.confidence, bounds: observation.boundingBox)
+        }
+        guard !lines.isEmpty else { throw ScreenshotError.noText }
+        return PaymentOCRText.assemble(lines)
     }
 }
 
@@ -38,27 +41,34 @@ struct RecordPaymentScreenshotIntent: AppIntent {
             try PaymentOCR.recognize(data)
         }.value
         var payment = PaymentParser.parse(recognized.text)
-        if recognized.confidence < 0.85 { payment.reasons.append("部分文字识别可信度偏低") }
+        if recognized.confidence < 0.85 { payment.reasons.append("金额或日期识别可信度偏低") }
         let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         let context = ModelContext(AssetStore.container)
         let existing = try context.fetch(FetchDescriptor<Expense>())
-        if existing.contains(where: { $0.screenshotHash == hash }) {
+        let previous = existing.first { $0.screenshotHash == hash }
+        if let previous, !previous.needsConfirmation {
             return .result(dialog: "这张截图已处理，没有重复记账。")
         }
-        if let id = payment.transactionID, existing.contains(where: {
+        // A pending record can be recognized again after parser updates without creating a duplicate.
+        let otherRecords = existing.filter { $0 !== previous }
+        if let id = payment.transactionID, otherRecords.contains(where: {
             $0.transactionID == id && $0.paymentChannel == payment.paymentChannel
         }) {
             // Keep both source images available for review; never silently overwrite an earlier entry.
             payment.reasons.append("交易单号与已有记录相同，请核对重复记录")
-        } else if existing.contains(where: {
+        } else if otherRecords.contains(where: {
             $0.merchant == payment.merchant && payment.merchant != nil &&
             $0.amountInCents == payment.amountInCents &&
             abs($0.date.timeIntervalSince(payment.date ?? .now)) < 120
         }) {
             payment.reasons.append("附近时间有同商户同金额记录，可能重复")
         }
-        let expense = Expense(amountInCents: payment.amountInCents ?? 0,
+        let expense = previous ?? Expense(amountInCents: payment.amountInCents ?? 0,
             category: payment.category, note: payment.merchant ?? "截图记账", date: payment.date ?? .now)
+        expense.amountInCents = payment.amountInCents ?? 0
+        expense.category = payment.category
+        expense.note = payment.merchant ?? "截图记账"
+        expense.date = payment.date ?? .now
         let accounts = try context.fetch(FetchDescriptor<AssetAccount>())
         expense.accountID = AssetRepository.matchingAccount(method: payment.paymentMethod, in: accounts)?.id
         expense.merchant = payment.merchant
@@ -71,7 +81,7 @@ struct RecordPaymentScreenshotIntent: AppIntent {
         expense.needsConfirmation = !payment.reasons.isEmpty
         expense.reviewReason = payment.reasons.joined(separator: "；")
         expense.dateIsEstimated = payment.date == nil
-        context.insert(expense)
+        if previous == nil { context.insert(expense) }
         try context.save()
         if expense.needsConfirmation {
             return .result(dialog: "截图已保存为待确认，暂未计入支出。可稍后在资产流核对。")

@@ -17,6 +17,20 @@ struct ParserChecks {
         precondition(!PaymentParser.parse(full + "\nUSD", now: now).reasons.isEmpty)
         precondition(PaymentParser.parse("支付成功\n优惠￥10.00").amountInCents == nil)
         precondition(PaymentParser.parse("实付金额：0.00").amountInCents == nil)
-        print("Payment parser: 10 checks passed")
+        let pocket = "支付宝小荷包（家庭小金库）\n−10.00\n自动扣款成功\n创建时间 2026-10-08 09:37:21\n付款方式 招商银行储蓄卡（1373）＞\n理由 自动攒\n对方账户 支付宝小荷包（家庭小金库）\n账单分类 账户存取"
+        let saved = PaymentParser.parse(pocket, now: now)
+        precondition(saved.amountInCents == 1000)
+        precondition(saved.merchant == "支付宝小荷包(家庭小金库)")
+        precondition(saved.paymentMethod == "招商银行储蓄卡(1373)")
+        precondition(saved.date != nil && saved.paymentChannel == "支付宝")
+        precondition(saved.reasons.isEmpty)
+        let columnOrder = "创建时间\n付款方式\n对方账户\n服务详情\n2026-10-08 09:37:21\n-10.00\n自动扣款成功"
+        let columnPayment = PaymentParser.parse(columnOrder, now: now)
+        precondition(columnPayment.date != nil)
+        precondition(columnPayment.merchant == nil)
+        precondition(!PaymentParser.parse(full + "\n账户存取", now: now).reasons.isEmpty)
+        precondition(!PaymentParser.parse(pocket.replacingOccurrences(of: "自动扣款成功", with: "待付款"), now: now).reasons.isEmpty)
+        precondition(!PaymentParser.parse(pocket + "\n退款成功", now: now).reasons.isEmpty)
+        print("Payment parser: all checks passed")
     }
 }
