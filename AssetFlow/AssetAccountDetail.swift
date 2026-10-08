@@ -14,7 +14,6 @@ struct AssetAccountDetail: View {
     @Query private var holdings: [StockHolding]
     @Query(sort: \AssetTransfer.date, order: .reverse) private var transfers: [AssetTransfer]
     @Query(sort: \Expense.date, order: .reverse) private var expenses: [Expense]
-    @AppStorage("hideLedgerAmounts") private var hidden = false
     @State private var editing = false
     @State private var checking = false
     @State private var addingStock = false
@@ -36,7 +35,7 @@ struct AssetAccountDetail: View {
                             Text("人民币账户").font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                    Text(assetMoney(portfolio.balance(account), hidden: hidden))
+                    Text(assetMoney(portfolio.balance(account), hidden: false))
                         .font(.system(.largeTitle, design: .rounded).weight(.bold))
                         .minimumScaleFactor(0.5).lineLimit(1)
                     Text("上次更新时间：" + portfolio.lastUpdateDate(account).formatted(date: .numeric, time: .shortened))
@@ -53,14 +52,14 @@ struct AssetAccountDetail: View {
                 Button(account.kind == .stocks ? "核对证券账户可用现金" : (account.managesTermDeposits ? "核对账户总余额" : "核对当前余额")) { checking = true }
             }
             if account.managesTermDeposits {
-                TermDepositSection(account: account, portfolio: portfolio, hidden: hidden)
+                TermDepositSection(account: account, portfolio: portfolio, hidden: false)
             }
             if account.kind == .stocks {
                 Section("证券账户构成") {
-                    LabeledContent("股票市值", value: assetMoney(portfolio.stockValue(account), hidden: hidden))
-                    LabeledContent("可用现金", value: assetMoney(portfolio.stockCash(account), hidden: hidden))
-                    LabeledContent("持仓成本", value: assetMoney(positions.reduce(0) { $0 + $1.costValue }, hidden: hidden))
-                    LabeledContent("浮动盈亏", value: assetMoney(positions.reduce(0) { $0 + $1.profit }, hidden: hidden))
+                    LabeledContent("股票市值", value: assetMoney(portfolio.stockValue(account), hidden: false))
+                    LabeledContent("可用现金", value: assetMoney(portfolio.stockCash(account), hidden: false))
+                    LabeledContent("持仓成本", value: assetMoney(positions.reduce(0) { $0 + $1.costValue }, hidden: false))
+                    LabeledContent("浮动盈亏", value: assetMoney(positions.reduce(0) { $0 + $1.profit }, hidden: false))
                     Text("浮动盈亏 = 当前市值 − 持仓成本，未计入已实现收益、分红与未纳入成本的费用。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
@@ -71,19 +70,19 @@ struct AssetAccountDetail: View {
                                 HStack {
                                     Text(holding.name).font(.headline).foregroundStyle(.primary)
                                     Spacer()
-                                    Text(assetMoney(holding.marketValue, hidden: hidden))
+                                    Text(assetMoney(holding.marketValue, hidden: false))
                                         .font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
                                 }
-                                Text(holding.symbol + " · " + (hidden ? "•••" : holding.quantityText) + " 股")
+                                Text(holding.symbol + " · " + holding.quantityText + " 股")
                                     .font(.caption).foregroundStyle(.secondary)
                                 HStack {
-                                    Text("现价 " + (hidden ? "•••" : holding.priceText))
+                                    Text("现价 " + holding.priceText)
                                     Spacer()
-                                    Text("盈亏 " + assetMoney(holding.profit, hidden: hidden))
+                                    Text("盈亏 " + assetMoney(holding.profit, hidden: false))
                                         .foregroundStyle(holding.profit >= 0 ? LedgerStyle.income : LedgerStyle.expense)
                                 }.font(.caption)
                                 if holding.costValue > 0 {
-                                    Text("盈亏率 " + (hidden ? "•••" : (Double(holding.profit) / Double(holding.costValue)).formatted(.percent.precision(.fractionLength(2)))))
+                                    Text("盈亏率 " + (Double(holding.profit) / Double(holding.costValue)).formatted(.percent.precision(.fractionLength(2))))
                                         .font(.caption).foregroundStyle(.secondary)
                                 }
                                 Text((holding.quoteSource ?? "手动价格") + " · " + (holding.quoteStatus ?? "未接入实时行情"))
@@ -113,7 +112,7 @@ struct AssetAccountDetail: View {
             if !linked.isEmpty {
                 Section("关联收支") {
                     ForEach(linked) { expense in
-                        NavigationLink { ExpenseDetailView(expense: expense) } label: { LedgerRow(expense: expense, hidden: hidden) }
+                        NavigationLink { ExpenseDetailView(expense: expense) } label: { LedgerRow(expense: expense) }
                     }
                 }
             }
@@ -127,7 +126,7 @@ struct AssetAccountDetail: View {
                                 let peer = accounts.first { $0.id == (incoming ? transfer.fromID : transfer.toID) }
                                 Text((incoming ? "转入 · " : "转出 · ") + (peer?.name ?? "已删除账户"))
                                 Spacer()
-                                Text(assetMoney(transfer.toID == account.id ? transfer.receivedInCents : transfer.amountInCents, hidden: hidden))
+                                Text(assetMoney(transfer.toID == account.id ? transfer.receivedInCents : transfer.amountInCents, hidden: false))
                             }.font(.subheadline)
                             Text(transfer.date, format: .dateTime.year().month().day().hour().minute())
                                 .font(.caption).foregroundStyle(.secondary)
@@ -145,7 +144,7 @@ struct AssetAccountDetail: View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Text(assetMoney(snapshot.amountInCents, hidden: hidden)).font(.subheadline)
+                        Text(assetMoney(snapshot.amountInCents, hidden: false)).font(.subheadline)
                     }
                 }
                 Text("余额核对替代该时点之前的余额推算；更早的收支仍保留在账本中。")

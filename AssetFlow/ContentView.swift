@@ -12,13 +12,13 @@ struct ContentView: View {
     @State private var day: Date?
     @State private var filterType = "全部"
     @State private var showingEntry = false
-    @AppStorage("hideLedgerAmounts") private var hidden = false
+    @State private var showingSettings = false
     @AppStorage(AppAppearance.storageKey) private var appearance = AppAppearance.system.rawValue
 
     init() {
         #if DEBUG
-        _tab = State(initialValue: CommandLine.arguments.contains("--demo-settings") ? 4 :
-            CommandLine.arguments.contains("--demo-charts") ? 1 :
+        _showingSettings = State(initialValue: CommandLine.arguments.contains("--demo-settings"))
+        _tab = State(initialValue: CommandLine.arguments.contains("--demo-charts") ? 1 :
             CommandLine.arguments.contains("--demo-calendar") ? 2 :
             (CommandLine.arguments.contains("--demo-assets") || CommandLine.arguments.contains("--demo-term-deposits")) ? 3 : 0)
         #endif
@@ -47,27 +47,26 @@ struct ContentView: View {
     var body: some View {
         TabView(selection: $tab) {
             NavigationStack {
-                LedgerListView(month: $month, hidden: $hidden, selectedCategory: $category, selectedDay: $day, type: $filterType,
+                LedgerListView(month: $month, selectedCategory: $category, selectedDay: $day, type: $filterType,
                     records: monthRecords, pending: expenses.filter(\.needsConfirmation), analytics: analytics,
                     add: { showingEntry = true })
+                    .toolbar { SettingsToolbar(showing: $showingSettings) }
             }
             .tabItem { Label("明细", systemImage: "list.bullet.rectangle") }.tag(0)
             NavigationStack {
-                LedgerChartsView(month: $month, hidden: hidden, analytics: analytics) { selected, income in
-                    category = selected; day = nil; filterType = income ? "收入" : "支出"; tab = 0
-                }
+                LedgerChartsView(month: $month, analytics: analytics, records: monthRecords)
+                    .toolbar { SettingsToolbar(showing: $showingSettings) }
             }
             .tabItem { Label("图表", systemImage: "chart.pie") }.tag(1)
             NavigationStack {
-                LedgerCalendarView(month: $month, hidden: hidden, analytics: analytics) { selected in
+                LedgerCalendarView(month: $month, analytics: analytics) { selected in
                     day = selected; category = nil; filterType = "全部"; tab = 0
                 }
+                .toolbar { SettingsToolbar(showing: $showingSettings) }
             }
             .tabItem { Label("日历", systemImage: "calendar") }.tag(2)
-            NavigationStack { assetPage }
+            NavigationStack { assetPage.toolbar { SettingsToolbar(showing: $showingSettings) } }
                 .tabItem { Label("资产", systemImage: "wallet.pass") }.tag(3)
-            NavigationStack { SettingsView() }
-                .tabItem { Label("设置", systemImage: "gearshape") }.tag(4)
         }
         .tint(LedgerStyle.accent)
         .environment(\.locale, Locale(identifier: "zh_CN"))
@@ -78,6 +77,16 @@ struct ContentView: View {
                 day = nil
                 filterType = "全部"
                 tab = 0
+            }
+        }
+        .sheet(isPresented: $showingSettings) {
+            NavigationStack {
+                SettingsView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("关闭") { showingSettings = false }
+                        }
+                    }
             }
         }
         .preferredColorScheme((AppAppearance(rawValue: appearance) ?? .system).colorScheme)

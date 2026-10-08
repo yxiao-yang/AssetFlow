@@ -9,7 +9,6 @@ struct AssetOverview: View {
     @Query private var holdings: [StockHolding]
     @Query private var transfers: [AssetTransfer]
     @Query private var expenses: [Expense]
-    @AppStorage("hideLedgerAmounts") private var hidden = false
     @State private var creating = false
     @State private var transferring = false
 
@@ -33,14 +32,9 @@ struct AssetOverview: View {
                 VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 14) {
                         Text("总资产 · 人民币").font(.subheadline).foregroundStyle(.secondary)
-                        Text(assetMoney(portfolio.total, hidden: hidden))
+                        Text(assetMoney(portfolio.total, hidden: false))
                             .font(.system(.largeTitle, design: .rounded).weight(.bold))
                             .lineLimit(1).minimumScaleFactor(0.5)
-                        HStack {
-                            Label("\(sorted.count) 个账户", systemImage: "square.stack")
-                            Spacer()
-                            Text("\(holdings.filter { holding in sorted.contains { $0.id == holding.accountID } }.count) 只持仓")
-                        }.font(.caption).foregroundStyle(.secondary)
                     }.padding(.vertical, 8)
                     HStack {
                         Button { creating = true } label: { Label("添加账户", systemImage: "plus.circle") }
@@ -55,7 +49,6 @@ struct AssetOverview: View {
                 Section {
                     ContentUnavailableView("把分散的资产放在一起", systemImage: "wallet.pass",
                         description: Text("选择账户大类，自定义名称并录入当前余额。"))
-                    Button("添加第一个账户") { creating = true }.frame(maxWidth: .infinity)
                 }
             } else {
                 Section("账户明细") {
@@ -71,7 +64,7 @@ struct AssetOverview: View {
                                     }
                                     Spacer()
                                     VStack(alignment: .trailing, spacing: 5) {
-                                        Text(assetMoney(portfolio.balance(account), hidden: hidden))
+                                        Text(assetMoney(portfolio.balance(account), hidden: false))
                                             .font(.subheadline.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.5)
                                             .foregroundStyle(portfolio.balance(account) < 0 ? .red : .primary)
 
@@ -83,7 +76,7 @@ struct AssetOverview: View {
                         }
                     }
                 }
-                if !hidden, !composition.isEmpty {
+                if !composition.isEmpty {
                     Section("资产分布") {
                         Chart(Array(composition.enumerated()), id: \.offset) { _, item in
                             SectorMark(angle: .value("资产", Double(item.value) / 100), innerRadius: .ratio(0.72), angularInset: 2)
@@ -122,7 +115,7 @@ struct AssetOverview: View {
                         NavigationLink {
                             List(unlinked) { expense in
                                 NavigationLink { ExpenseDetailView(expense: expense) } label: {
-                                    LedgerRow(expense: expense, hidden: hidden)
+                                    LedgerRow(expense: expense)
                                 }
                             }.navigationTitle("未关联账户的收支").navigationBarTitleDisplayMode(.inline)
                         } label: {
@@ -138,12 +131,6 @@ struct AssetOverview: View {
         }
         .listSectionSpacing(14)
         .navigationTitle("我的资产").navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { hidden.toggle() } label: { Image(systemName: hidden ? "eye.slash" : "eye") }
-                    .accessibilityLabel(hidden ? "显示金额" : "隐藏金额")
-            }
-        }
         .sheet(isPresented: $creating) { AssetAccountEditor() }
         .sheet(isPresented: $transferring) { AssetTransferEditor() }
     }

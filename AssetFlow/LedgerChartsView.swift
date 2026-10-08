@@ -3,9 +3,8 @@ import Charts
 
 struct LedgerChartsView: View {
     @Binding var month: Date
-    let hidden: Bool
     let analytics: LedgerAnalytics
-    let selectCategory: (String, Bool) -> Void
+    let records: [Expense]
     @State private var isIncome = false
     private var categories: [CategoryTotal] { analytics.categories(isIncome: isIncome) }
     private var total: Int { isIncome ? analytics.income : analytics.expense }
@@ -19,12 +18,7 @@ struct LedgerChartsView: View {
                     Text("收入").tag(true)
                 }.pickerStyle(.segmented)
             }.listRowSeparator(.hidden)
-            if hidden {
-                Section {
-                    ContentUnavailableView("金额已隐藏", systemImage: "eye.slash",
-                        description: Text("在明细页开启金额显示后查看图表。"))
-                }
-            } else if categories.isEmpty {
+            if categories.isEmpty {
                 Section {
                     ContentUnavailableView("暂无统计数据", systemImage: "chart.pie",
                         description: Text("这个月还没有已确认的\(isIncome ? "收入" : "支出")。"))
@@ -64,9 +58,15 @@ struct LedgerChartsView: View {
                     } }
                     .chartYAxisLabel("元")
                 }
-                Section("分类排行 · 点击查看明细") {
+                Section("分类排行 · 点击展开流水") {
                     ForEach(categories) { item in
-                        Button { selectCategory(item.category, isIncome) } label: {
+                        DisclosureGroup {
+                            ForEach(records.filter { $0.category == item.category && $0.isIncome == isIncome }.sorted { $0.date > $1.date }) { expense in
+                                NavigationLink { ExpenseDetailView(expense: expense) } label: {
+                                    LedgerRow(expense: expense)
+                                }
+                            }
+                        } label: {
                             VStack(spacing: 10) {
                                 HStack(spacing: 12) {
                                     CategoryIcon(category: item.category)
@@ -77,12 +77,11 @@ struct LedgerChartsView: View {
                                     }
                                     Spacer()
                                     Text(money(item.cents)).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
-                                    Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
                                 }
                                 ProgressView(value: Double(item.cents), total: Double(total))
                                     .tint(LedgerStyle.color(item.category))
                             }.padding(.vertical, 5)
-                        }.buttonStyle(.plain)
+                        }
                     }
                 }
             }
@@ -95,7 +94,6 @@ struct LedgerChartsView: View {
 
 struct LedgerCalendarView: View {
     @Binding var month: Date
-    let hidden: Bool
     let analytics: LedgerAnalytics
     let selectDay: (Date) -> Void
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 5), count: 7)
@@ -149,9 +147,9 @@ struct LedgerCalendarView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }.listRowSeparator(.hidden)
             Section("月度小结") {
-                LabeledContent("支出", value: money(analytics.expense, hidden: hidden))
-                LabeledContent("收入", value: money(analytics.income, hidden: hidden))
-                LabeledContent("结余", value: money(analytics.balance, hidden: hidden))
+                LabeledContent("支出", value: money(analytics.expense, hidden: false))
+                LabeledContent("收入", value: money(analytics.income, hidden: false))
+                LabeledContent("结余", value: money(analytics.balance, hidden: false))
                 LabeledContent("记账天数", value: "\(analytics.days.filter { $0.count > 0 }.count) 天")
             }
         }
@@ -160,7 +158,7 @@ struct LedgerCalendarView: View {
         .listStyle(.insetGrouped)
     }
     private func calendarAmount(_ cents: Int, color: Color) -> some View {
-        Text(hidden ? "•••" : (Double(cents) / 100).formatted(.number.notation(.compactName).precision(.fractionLength(0...1))))
+        Text((Double(cents) / 100).formatted(.number.notation(.compactName).precision(.fractionLength(0...1))))
             .font(.system(size: 9, weight: .medium)).foregroundStyle(color)
             .lineLimit(1).minimumScaleFactor(0.6)
     }

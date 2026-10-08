@@ -2,7 +2,6 @@ import SwiftUI
 
 struct LedgerListView: View {
     @Binding var month: Date
-    @Binding var hidden: Bool
     @Binding var selectedCategory: String?
     @Binding var selectedDay: Date?
     @Binding var type: String
@@ -30,7 +29,7 @@ struct LedgerListView: View {
                 summary
                 if !pending.isEmpty {
                     NavigationLink {
-                        PendingLedgerView(records: pending, hidden: hidden)
+                        PendingLedgerView(records: pending)
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "tray.fill").foregroundStyle(.orange)
@@ -66,7 +65,6 @@ struct LedgerListView: View {
                     ContentUnavailableView("这个范围还没有记录",
                         systemImage: "doc.text.magnifyingglass",
                         description: Text("切换月份或筛选条件，也可以记下第一笔。"))
-                    Button("记一笔", action: add).frame(maxWidth: .infinity)
                 }
             } else {
                 ForEach(dates, id: \.self) { date in
@@ -74,7 +72,7 @@ struct LedgerListView: View {
                     Section {
                         ForEach(rows) { row in
                             NavigationLink { ExpenseDetailView(expense: row) } label: {
-                                LedgerRow(expense: row, hidden: hidden)
+                                LedgerRow(expense: row)
                             }
                         }
                     } header: {
@@ -87,16 +85,6 @@ struct LedgerListView: View {
         .listSectionSpacing(14)
         .navigationTitle("资产流")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { hidden.toggle() } label: { Image(systemName: hidden ? "eye.slash" : "eye") }
-                    .accessibilityLabel(hidden ? "显示金额" : "隐藏金额")
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(action: add) { Image(systemName: "plus.circle.fill") }
-                    .accessibilityLabel("记一笔")
-            }
-        }
         .safeAreaInset(edge: .bottom) {
             HStack {
                 Text("\(filtered.count) 笔记录").font(.caption).foregroundStyle(.secondary)
@@ -116,7 +104,7 @@ struct LedgerListView: View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 7) {
                 Text("月度支出").font(.subheadline).foregroundStyle(.secondary)
-                Text(money(analytics.expense, hidden: hidden))
+                Text(money(analytics.expense, hidden: false))
                     .font(.system(.largeTitle, design: .rounded).weight(.bold))
                     .lineLimit(1).minimumScaleFactor(0.5).monospacedDigit()
             }
@@ -136,7 +124,7 @@ struct LedgerListView: View {
     private func metric(_ title: String, cents: Int, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).font(.caption).foregroundStyle(.secondary)
-            Text(money(cents, hidden: hidden)).font(.subheadline.weight(.semibold))
+            Text(money(cents, hidden: false)).font(.subheadline.weight(.semibold))
                 .foregroundStyle(color).lineLimit(1).minimumScaleFactor(0.5)
         }
     }
@@ -147,8 +135,8 @@ struct LedgerListView: View {
             VStack(alignment: .trailing, spacing: 3) {
                 let expense = rows.filter { !$0.isIncome }.reduce(0) { $0 + $1.amountInCents }
                 let income = rows.filter(\.isIncome).reduce(0) { $0 + $1.amountInCents }
-                if expense > 0 { Text("支出 " + money(expense, hidden: hidden)) }
-                if income > 0 { Text("收入 " + money(income, hidden: hidden)) }
+                if expense > 0 { Text("支出 " + money(expense, hidden: false)) }
+                if income > 0 { Text("收入 " + money(income, hidden: false)) }
             }.font(.caption)
         }.textCase(nil)
     }
@@ -157,7 +145,6 @@ struct LedgerListView: View {
 
 struct LedgerRow: View {
     let expense: Expense
-    let hidden: Bool
     var body: some View {
         HStack(spacing: 12) {
             CategoryIcon(category: expense.category)
@@ -171,7 +158,7 @@ struct LedgerRow: View {
             }
             Spacer(minLength: 4)
             VStack(alignment: .trailing, spacing: 5) {
-                Text((hidden ? "" : expense.isIncome ? "+" : "−") + money(expense.amountInCents, hidden: hidden))
+                Text((expense.isIncome ? "+" : "−") + money(expense.amountInCents, hidden: false))
                     .font(.subheadline.weight(.semibold)).monospacedDigit()
                     .foregroundStyle(expense.isIncome ? LedgerStyle.income : .primary)
                     .lineLimit(1).minimumScaleFactor(0.7)
@@ -184,7 +171,6 @@ struct LedgerRow: View {
 
 struct PendingLedgerView: View {
     let records: [Expense]
-    let hidden: Bool
     var body: some View {
         List {
             Section {
@@ -194,7 +180,7 @@ struct PendingLedgerView: View {
             ForEach(records) { row in
                 NavigationLink { ExpenseDetailView(expense: row) } label: {
                     VStack(alignment: .leading, spacing: 6) {
-                        LedgerRow(expense: row, hidden: hidden)
+                        LedgerRow(expense: row)
                         Text(row.reviewReason ?? "请核对").font(.caption).foregroundStyle(.orange)
                     }
                 }

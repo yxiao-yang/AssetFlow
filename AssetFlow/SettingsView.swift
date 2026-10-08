@@ -52,3 +52,13 @@ struct SettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 }
+
+struct SettingsToolbar: ToolbarContent {
+    @Binding var showing: Bool
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Button { showing = true } label: { Image(systemName: "gearshape") }
+                .accessibilityLabel("设置")
+        }
+    }
+}
