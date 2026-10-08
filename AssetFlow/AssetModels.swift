@@ -2,13 +2,21 @@ import Foundation
 import SwiftData
 
 enum AssetKind: String, CaseIterable, Identifiable {
-    case debitCard, passbook, stocks, wechat, alipayBalance, yuebao, cash, other
+    case funds, debitCard, passbook, stocks, wechat, alipayBalance, yuebao, cash, other
+    static let selectable: [AssetKind] = [.funds, .stocks, .cash, .other]
+    var category: AssetKind {
+        switch self {
+        case .debitCard, .passbook, .wechat, .alipayBalance, .yuebao: .funds
+        default: self
+        }
+    }
     var id: String { rawValue }
     var title: String {
         switch self {
+        case .funds: "资金账户"
         case .debitCard: "储蓄卡"
         case .passbook: "存折"
-        case .stocks: "股票账户"
+        case .stocks: "投资账户"
         case .wechat: "微信零钱"
         case .alipayBalance: "支付宝余额"
         case .yuebao: "余额宝"
@@ -18,6 +26,7 @@ enum AssetKind: String, CaseIterable, Identifiable {
     }
     var icon: String {
         switch self {
+        case .funds: "wallet.pass.fill"
         case .debitCard: "creditcard.fill"
         case .passbook: "book.closed.fill"
         case .stocks: "chart.line.uptrend.xyaxis"
@@ -44,6 +53,12 @@ final class AssetAccount {
     var note: String
     var createdAt: Date
     var archivedAt: Date?
+    var updatedAt: Date?
+    var previousUpdatedAt: Date?
+    func recordUpdate(at date: Date = .now, previousDate: Date? = nil) {
+        previousUpdatedAt = previousDate ?? updatedAt ?? createdAt
+        updatedAt = date
+    }
     var kind: AssetKind { AssetKind(rawValue: kindRaw) ?? .other }
     init(name: String, kind: AssetKind, institution: String = "", lastFour: String = "", note: String = "", createdAt: Date = .now) {
         self.name = name; self.kindRaw = kind.rawValue; self.institution = institution

@@ -38,6 +38,10 @@ struct AssetPortfolio {
         guard values.allSatisfy({ $0 != nil }) else { return nil }
         return values.reduce(0) { $0 + ($1 ?? 0) }
     }
+    func lastUpdateDate(_ account: AssetAccount) -> Date {
+        max(account.updatedAt ?? account.createdAt,
+            snapshots.filter { $0.accountID == account.id }.map(\.date).max() ?? account.createdAt)
+    }
     func positions(_ account: AssetAccount) -> [StockHolding] { holdings.filter { $0.accountID == account.id } }
     func stockValue(_ account: AssetAccount) -> Int { positions(account).reduce(0) { $0 + $1.marketValue } }
     func stockCash(_ account: AssetAccount) -> Int { balance(account) - stockValue(account) }
@@ -71,6 +75,18 @@ enum AssetRepository {
         let matches = accounts.filter { account in
             guard account.archivedAt == nil, account.currencyCode == "CNY" else { return false }
             switch account.kind {
+            case .funds:
+                if account.lastFour.count == 4,
+                   method.range(of: "(?<![0-9])" + account.lastFour + "(?![0-9])", options: .regularExpression) != nil { return true }
+                let payment = method.trimmingCharacters(in: .whitespacesAndNewlines)
+                // Generic accounts match explicit payment names; ambiguous matches remain unlinked.
+                if payment.contains("零钱通") { return account.name.contains("零钱通") }
+                if payment.contains("零钱") { return account.name.contains("零钱") && !account.name.contains("零钱通") }
+                if payment.contains("余额宝") { return account.name.contains("余额宝") }
+                if ["余额", "支付宝余额"].contains(payment) {
+                    return account.name.contains("支付宝余额") && !account.name.contains("余额宝")
+                }
+                return false
             case .debitCard, .passbook:
                 guard account.lastFour.count == 4 else { return false }
                 let pattern = "(?<![0-9])" + account.lastFour + "(?![0-9])"

@@ -11,23 +11,29 @@ struct AssetAccountEditor: View {
     @State private var institution: String
     @State private var lastFour: String
     @State private var note: String
-    @State private var depositStyle: String
     @State private var annualRate: String
     @State private var maturity: Date
+    @State private var hasMaturity: Bool
     @State private var balance = ""
     @State private var failed = false
+    @Query private var snapshots: [AssetBalanceSnapshot]
+    private var lastUpdate: Date? {
+        guard let existing else { return nil }
+        return max(existing.updatedAt ?? existing.createdAt,
+            snapshots.filter { $0.accountID == existing.id }.map(\.date).max() ?? existing.createdAt)
+    }
 
     init(existing: AssetAccount? = nil) {
         self.existing = existing
         _name = State(initialValue: existing?.name ?? "")
-        _kind = State(initialValue: existing?.kind ?? .debitCard)
+        _kind = State(initialValue: existing?.kind.category ?? .funds)
         _currency = State(initialValue: existing?.currencyCode ?? "CNY")
         _institution = State(initialValue: existing?.institution ?? "")
         _lastFour = State(initialValue: existing?.lastFour ?? "")
         _note = State(initialValue: existing?.note ?? "")
-        _depositStyle = State(initialValue: existing?.depositStyle ?? "活期")
         _annualRate = State(initialValue: existing?.annualRateText ?? "")
         _maturity = State(initialValue: existing?.maturityDate ?? .now)
+        _hasMaturity = State(initialValue: existing?.maturityDate != nil)
     }
     private var valid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
@@ -39,35 +45,42 @@ struct AssetAccountEditor: View {
         NavigationStack {
             Form {
                 Section("账户资料") {
-                    TextField("名称，如 招商银行储蓄卡", text: $name)
+                    TextField("自定义名称，如 工资卡、微信零钱", text: $name)
                     Picker("类型", selection: $kind) {
-                        ForEach(AssetKind.allCases) { Text($0.title).tag($0) }
+                        ForEach(AssetKind.selectable) { Text($0.title).tag($0) }
                     }.disabled(existing != nil)
                     Picker("币种", selection: $currency) {
                         Text("人民币 CNY").tag("CNY")
                         Text("港币 HKD").tag("HKD")
                     }.disabled(existing != nil)
                     TextField("银行／券商／机构（选填）", text: $institution)
-                    if kind == .debitCard || kind == .passbook {
+                    if kind == .funds {
                         TextField("账号尾号 4 位（选填）", text: $lastFour).keyboardType(.numberPad)
                         Text("只保存尾号，用于识别截图扣款账户；不需要完整账号。")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     TextField("备注（选填）", text: $note, axis: .vertical)
                 }
-                if kind == .passbook {
-                    Section("存款信息") {
-                        Picker("存款类型", selection: $depositStyle) {
-                            Text("活期").tag("活期")
-                            Text("定期").tag("定期")
+                if kind == .funds {
+                    Section {
+                        DisclosureGroup("存款／收益信息（选填）") {
+                            TextField("年利率／收益率参考 %", text: $annualRate).keyboardType(.decimalPad)
+                            Toggle("记录存款到期日", isOn: $hasMaturity)
+                            if hasMaturity {
+                                DatePicker("到期日", selection: $maturity, displayedComponents: .date)
+                            }
+                            Text("用于记录存折或余额宝等账户的参考信息，不自动计入收益。")
+                                .font(.caption).foregroundStyle(.secondary)
                         }
-                        if depositStyle == "定期" { DatePicker("到期日", selection: $maturity, displayedComponents: .date) }
-                        TextField("年利率 %（选填）", text: $annualRate).keyboardType(.decimalPad)
                     }
-                } else if kind == .yuebao {
-                    Section("收益参考") {
-                        TextField("七日年化 %（选填）", text: $annualRate).keyboardType(.decimalPad)
-                        Text("手动记录参考值，不据此自动计入收益。实际收益请核对余额或记录收入。")
+                }
+                if let lastUpdate {
+                    Section("更新时间") {
+                        LabeledContent("上次更新时间", value: lastUpdate.formatted(date: .numeric, time: .shortened))
+                        if let previous = existing?.previousUpdatedAt {
+                            LabeledContent("前次更新时间", value: previous.formatted(date: .numeric, time: .shortened))
+                        }
+                        Text("保存后记录本次更新时间，前次时间仍会保留。")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -94,11 +107,13 @@ struct AssetAccountEditor: View {
     private func save() {
         let account = existing ?? AssetAccount(name: name, kind: kind)
         account.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        account.depositStyle = depositStyle
+        account.depositStyle = hasMaturity ? "定期" : "活期"
         account.annualRateText = annualRate.isEmpty ? nil : annualRate
-        account.maturityDate = kind == .passbook && depositStyle == "定期" ? maturity : nil
+        account.maturityDate = hasMaturity ? maturity : nil
         account.institution = institution; account.lastFour = lastFour; account.note = note
+        if existing != nil { account.recordUpdate(previousDate: lastUpdate) }
         if existing == nil {
+            account.updatedAt = account.createdAt
             account.currencyCode = currency
             context.insert(account)
             context.insert(AssetBalanceSnapshot(accountID: account.id, amountInCents: AssetMath.cents(balance)!,
@@ -115,9 +130,17 @@ struct AssetBalanceEditor: View {
     @State private var amount = ""
     @State private var note = ""
     @State private var failed = false
+    @Query private var snapshots: [AssetBalanceSnapshot]
+    private var lastUpdate: Date {
+        max(account.updatedAt ?? account.createdAt,
+            snapshots.filter { $0.accountID == account.id }.map(\.date).max() ?? account.createdAt)
+    }
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    LabeledContent("上次更新时间", value: lastUpdate.formatted(date: .numeric, time: .shortened))
+                }
                 Section(account.kind == .stocks ? "当前可用现金 · \(account.currencyCode)" : "当前账户余额 · \(account.currencyCode)") {
                     TextField("输入核对后的金额", text: $amount).keyboardType(.decimalPad)
                     TextField("核对说明（选填）", text: $note)
@@ -136,7 +159,9 @@ struct AssetBalanceEditor: View {
         do {
             let portfolio = try AssetRepository.fetch(context)
             let value = AssetMath.cents(amount)! + (account.kind == .stocks ? portfolio.stockValue(account) : 0)
-            context.insert(AssetBalanceSnapshot(accountID: account.id, amountInCents: value,
+            let now = Date()
+            account.recordUpdate(at: now, previousDate: portfolio.lastUpdateDate(account))
+            context.insert(AssetBalanceSnapshot(accountID: account.id, amountInCents: value, date: now,
                 note: note.isEmpty ? "余额核对" : note))
             try context.save(); dismiss()
         } catch { context.rollback(); failed = true }

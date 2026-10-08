@@ -42,9 +42,9 @@ struct StockHoldingEditor: View {
                     TextField(account.currencyCode == "HKD" ? "港股代码，如 00700" : "股票代码，6 位", text: $symbol)
                         .keyboardType(.numberPad)
                     TextField("持仓数量（股）", text: $quantity).keyboardType(.decimalPad)
-                    TextField("平均成本价（每股）", text: $cost).keyboardType(.decimalPad)
-                    TextField("当前价格（每股）", text: $price).keyboardType(.decimalPad)
-                    Text("价格最多 4 位小数，数量最多 6 位小数。平均成本价可使用券商显示的含费用成本。")
+                    TextField("成交均价／成本价（每股）", text: $cost).keyboardType(.decimalPad)
+                    TextField("当前参考价（每股，手动）", text: $price).keyboardType(.decimalPad)
+                    Text("价格最多 4 位小数，数量最多 6 位小数。单笔买入可填成交价；多笔买入请填平均成本价，可使用券商显示的含费用成本。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if valid {
@@ -55,7 +55,7 @@ struct StockHoldingEditor: View {
                     }
                 }
                 Section {
-                    Text("这是持仓核对，不会执行买卖或扣减证券现金。调整数量后，请另外核对券商可用现金。手动修改价格会清除该笔价格的自动行情标记。")
+                    Text("录入后自动计算市值和浮动盈亏。当前参考价需手动更新；调整持有数量后，请另外核对券商可用现金。")
                         .font(.caption).foregroundStyle(.secondary)
                     if existing != nil { Button("移除此持仓", role: .destructive) { deleting = true } }
                 }
@@ -86,10 +86,12 @@ struct StockHoldingEditor: View {
                 costPriceText: cost, priceText: price)
             holding.name = name.trimmingCharacters(in: .whitespacesAndNewlines); holding.symbol = code!
             holding.quantityText = quantity; holding.costPriceText = cost; holding.priceText = price
-            holding.updatedAt = .now; holding.quoteSource = nil; holding.quoteDate = nil; holding.quoteStatus = nil
+            let now = Date()
+            account.recordUpdate(at: now, previousDate: portfolio.lastUpdateDate(account))
+            holding.updatedAt = now; holding.quoteSource = nil; holding.quoteDate = nil; holding.quoteStatus = nil
             if existing == nil { context.insert(holding) }
             let others = positions.filter { $0 !== holding }.reduce(0) { $0 + $1.marketValue }
-            context.insert(AssetBalanceSnapshot(accountID: account.id, amountInCents: cash + others + holding.marketValue, note: "持仓与价格核对"))
+            context.insert(AssetBalanceSnapshot(accountID: account.id, amountInCents: cash + others + holding.marketValue, date: now, note: "持仓与价格核对"))
             try context.save(); dismiss()
         } catch { context.rollback(); self.error = "未能保存持仓，请重试。" }
     }
@@ -98,8 +100,10 @@ struct StockHoldingEditor: View {
         do {
             let portfolio = try AssetRepository.fetch(context)
             let value = portfolio.balance(account) - existing.marketValue
+            let now = Date()
+            account.recordUpdate(at: now, previousDate: portfolio.lastUpdateDate(account))
             context.delete(existing)
-            context.insert(AssetBalanceSnapshot(accountID: account.id, amountInCents: value, note: "移除持仓"))
+            context.insert(AssetBalanceSnapshot(accountID: account.id, amountInCents: value, date: now, note: "移除持仓"))
             try context.save(); dismiss()
         } catch { context.rollback(); self.error = "未能移除持仓，请重试。" }
     }

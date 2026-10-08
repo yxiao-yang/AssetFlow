@@ -22,8 +22,8 @@ struct AssetOverview: View {
         portfolio.activeAccounts.sorted { (portfolio.converted($0) ?? 0) > (portfolio.converted($1) ?? 0) }
     }
     private var composition: [(kind: AssetKind, value: Int)] {
-        AssetKind.allCases.compactMap { kind in
-            let value = sorted.filter { $0.kind == kind }.reduce(0) { $0 + max(0, portfolio.converted($1) ?? 0) }
+        AssetKind.selectable.compactMap { kind in
+            let value = sorted.filter { $0.kind.category == kind }.reduce(0) { $0 + max(0, portfolio.converted($1) ?? 0) }
             return value > 0 ? (kind, value) : nil
         }.sorted { $0.value > $1.value }
     }
@@ -68,30 +68,34 @@ struct AssetOverview: View {
             if sorted.isEmpty {
                 Section {
                     ContentUnavailableView("把分散的资产放在一起", systemImage: "wallet.pass",
-                        description: Text("添加储蓄卡、存折、证券账户、微信零钱和余额宝，录入当前余额。"))
+                        description: Text("选择账户大类，自定义名称并录入当前余额。"))
                     Button("添加第一个账户") { creating = true }.frame(maxWidth: .infinity)
                 }
             } else {
                 Section("账户明细") {
                     ForEach(sorted) { account in
                         NavigationLink { AssetAccountDetail(account: account) } label: {
-                            HStack(spacing: 12) {
-                                AssetAccountIcon(kind: account.kind)
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Text(account.name).font(.subheadline.weight(.semibold))
-                                    Text(account.kind.title + (account.lastFour.isEmpty ? "" : " · 尾号 " + account.lastFour))
-                                        .font(.caption).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 5) {
-                                    Text(assetMoney(portfolio.balance(account), currency: account.currencyCode, hidden: hidden))
-                                        .font(.subheadline.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.5)
-                                        .foregroundStyle(portfolio.balance(account) < 0 ? .red : .primary)
-                                    if account.currencyCode == "HKD", let value = portfolio.converted(account) {
-                                        Text("≈ " + assetMoney(value, hidden: hidden)).font(.caption2).foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 12) {
+                                    AssetAccountIcon(kind: account.kind.category)
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        Text(account.name).font(.subheadline.weight(.semibold))
+                                        Text(account.kind.category.title + (account.lastFour.isEmpty ? "" : " · 尾号 " + account.lastFour))
+                                            .font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    VStack(alignment: .trailing, spacing: 5) {
+                                        Text(assetMoney(portfolio.balance(account), currency: account.currencyCode, hidden: hidden))
+                                            .font(.subheadline.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.5)
+                                            .foregroundStyle(portfolio.balance(account) < 0 ? .red : .primary)
+                                        if account.currencyCode == "HKD", let value = portfolio.converted(account) {
+                                            Text("≈ " + assetMoney(value, hidden: hidden)).font(.caption2).foregroundStyle(.secondary)
+                                        }
                                     }
                                 }
-                            }.padding(.vertical, 4)
+                                Text("上次更新时间 " + portfolio.lastUpdateDate(account).formatted(date: .numeric, time: .shortened))
+                                    .font(.caption2).foregroundStyle(.secondary).padding(.leading, 56)
+                                }.padding(.vertical, 4)
                         }
                     }
                 }

@@ -20,25 +20,26 @@ struct AssetAccountDetail: View {
             transfers: transfers, expenses: expenses, rates: rates)
     }
     private var positions: [StockHolding] { portfolio.positions(account).sorted { $0.marketValue > $1.marketValue } }
-    private var latest: AssetBalanceSnapshot? { snapshots.first { $0.accountID == account.id } }
 
     var body: some View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
-                        AssetAccountIcon(kind: account.kind)
+                        AssetAccountIcon(kind: account.kind.category)
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(account.kind.title).font(.headline)
+                            Text(account.kind.category.title).font(.headline)
                             Text(account.currencyCode == "HKD" ? "港币账户" : "人民币账户").font(.caption).foregroundStyle(.secondary)
                         }
                     }
                     Text(assetMoney(portfolio.balance(account), currency: account.currencyCode, hidden: hidden))
                         .font(.system(.largeTitle, design: .rounded).weight(.bold))
                         .minimumScaleFactor(0.5).lineLimit(1)
-                    if let latest {
-                        Text("最近核对：" + latest.date.formatted(date: .abbreviated, time: .shortened))
-                            .font(.caption).foregroundStyle(.secondary)
+                    Text("上次更新时间：" + portfolio.lastUpdateDate(account).formatted(date: .numeric, time: .shortened))
+                        .font(.caption).foregroundStyle(.secondary)
+                    if let previous = account.previousUpdatedAt {
+                        Text("前次更新时间：" + previous.formatted(date: .numeric, time: .shortened))
+                            .font(.caption2).foregroundStyle(.secondary)
                     }
                     if portfolio.balance(account) < 0 {
                         Text("余额为负，请检查期初余额、账户关联和遗漏的入账。")
@@ -91,12 +92,12 @@ struct AssetAccountDetail: View {
             Section("账户资料") {
                 LabeledContent("机构", value: account.institution.isEmpty ? "未填写" : account.institution)
                 if !account.lastFour.isEmpty { LabeledContent("尾号", value: account.lastFour) }
-                if account.kind == .passbook {
+                if account.kind == .passbook || account.maturityDate != nil {
                     LabeledContent("存款类型", value: account.depositStyle)
                     if let date = account.maturityDate { LabeledContent("到期日", value: date.formatted(date: .abbreviated, time: .omitted)) }
                 }
                 if let rate = account.annualRateText {
-                    LabeledContent(account.kind == .yuebao ? "七日年化（参考）" : "年利率", value: rate + "%")
+                    LabeledContent(account.kind == .yuebao ? "七日年化（参考）" : "年利率／收益率参考", value: rate + "%")
                 }
                 if !account.note.isEmpty { Text(account.note).font(.subheadline) }
                 Button("编辑账户资料") { editing = true }

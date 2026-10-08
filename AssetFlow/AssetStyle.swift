@@ -7,6 +7,7 @@ func assetMoney(_ cents: Int, currency: String = "CNY", hidden: Bool = false) ->
 extension AssetKind {
     var color: Color {
         switch self {
+        case .funds: .blue
         case .debitCard: .blue
         case .passbook: .indigo
         case .stocks: .purple

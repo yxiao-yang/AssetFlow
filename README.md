@@ -70,13 +70,14 @@ Debug 编译开启 `SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG` 后，可通过�
 
 「资产」页展示折合人民币总资产、原币账户余额、类型占比和近 90 天趋势。示例数据只在 Debug 的独立内存模式中出现，不会进入个人账本。
 
-- 储蓄卡：账户名称、银行、尾号 4 位、币种、余额、关联收支、转账与余额核对历史。
-- 存折：额外记录活期／定期、年利率和到期日。
-- 微信零钱、支付宝余额、余额宝：分别建账；余额宝可记录七日年化参考值，实际收益通过收入或余额核对记录。
-- 证券账户：可用现金和股票市值分开，合计计入资产；逐只股票记录名称、代码、数量、平均成本和当前价，展示市值、成本、浮动盈亏与盈亏率。
+- 账户类型简化为「资金账户、投资账户、现金、其他资产」，账户名称始终自定义。
+- 储蓄卡、存折、微信零钱、支付宝余额和余额宝统一按资金账户展示；旧记录的细分类在存储中保留，名称、余额和关联收支不变。
+- 资金账户可填写机构、尾号和备注，在折叠的「存款／收益信息」中选填收益率参考及到期日。
+- 投资账户：现金和股票市值分开，合计计入资产；逐只股票手动记录名称、代码、数量、成交均价／成本价和当前参考价，展示市值、成本、浮动盈亏与盈亏率。
+- 列表、详情、编辑资料及余额核对页面显示「上次更新时间」。编辑账户资料、核对余额和更新持仓时保存新时间，并保留「前次更新时间」；收支和转账不会覆盖手动更新时间。旧账户从已有余额快照或创建时间恢复显示，不能据此认为外部余额已实时同步。
 - 港股用 HKD 展示。设置 HKD → CNY 汇率后才汇总到人民币；未设置时提示补充汇率，不把两种币种直接相加。
 - 汇率可手动填写，也可获取 [Frankfurter 每日参考汇率](https://frankfurter.dev/)。显示来源与参考日期；它不是实时换汇成交价。
-- 股票价格当前手动核对，明确标记来源和价格时间。实时港股行情尚未接入，待股票代码、券商和行情权限确定后选择接入方式。
+- 股票价格当前手动核对，明确标记来源和价格时间。初版采用全手动录入，暂不接入行情服务。单笔买入填成交价，多笔买入填平均成本价；当前参考价用于估算市值和浮动盈亏。
 
 ### 录入和日常使用
 
@@ -97,6 +98,8 @@ xcrun swiftc AssetFlow/AssetMath.swift Tests/AssetMathChecks.swift -o /tmp/asset
 /tmp/assetflow-asset-math
 xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetRepository.swift Tests/AssetIntegrationChecks.swift -o /tmp/assetflow-asset-integration
 /tmp/assetflow-asset-integration
+xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetRepository.swift Tests/AccountUpdateChecks.swift -o /tmp/assetflow-account-updates
+/tmp/assetflow-account-updates
 ```
 
 覆盖金额与估值精度、余额快照边界、待确认收支排除、转账、截图账户匹配、港币换算和证券现金。Debug 启动参数 `--demo-ledger --demo-assets` 打开独立内存示例资产页面。
