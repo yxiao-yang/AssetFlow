@@ -17,9 +17,11 @@ struct ExpenseEntryView: View {
         accounts.filter { $0.archivedAt == nil && $0.currencyCode == "CNY" && $0.kind != .stocks }
     }
     private let existing: Expense?
+    private let onSaved: (Expense) -> Void
 
-    init(existing: Expense? = nil) {
+    init(existing: Expense? = nil, onSaved: @escaping (Expense) -> Void = { _ in }) {
         self.existing = existing
+        self.onSaved = onSaved
         _accountID = State(initialValue: existing?.accountID)
         _isIncome = State(initialValue: existing?.isIncome ?? false)
         _amount = State(initialValue: existing.map {
@@ -119,6 +121,7 @@ struct ExpenseEntryView: View {
         if existing == nil { context.insert(expense) }
         do {
             try context.save()
+            onSaved(expense)
             dismiss()
         } catch {
             context.rollback()

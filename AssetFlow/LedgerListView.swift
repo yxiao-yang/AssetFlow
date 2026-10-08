@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LedgerListView: View {
     @Binding var month: Date
+    @Binding var search: String
     @Binding var hidden: Bool
     @Binding var selectedCategory: String?
     @Binding var selectedDay: Date?
@@ -10,7 +11,6 @@ struct LedgerListView: View {
     let pending: [Expense]
     let analytics: LedgerAnalytics
     let add: () -> Void
-    @State private var search = ""
 
     private var filtered: [Expense] {
         records.filter { row in

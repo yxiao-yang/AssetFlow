@@ -68,6 +68,8 @@ struct MonthSelector: View {
             Button { move(1) } label: { Image(systemName: "chevron.right").frame(width: 40, height: 44) }
                 .disabled(isCurrent).accessibilityLabel("下个月")
         }
+        // Keep each control independent when this selector sits inside a List row.
+        .buttonStyle(.borderless)
     }
     private func move(_ value: Int) {
         if let start = Calendar.current.dateInterval(of: .month, for: month)?.start,

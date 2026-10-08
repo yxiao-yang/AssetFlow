@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var category: String?
     @State private var day: Date?
     @State private var filterType = "全部"
+    @State private var search = ""
     @State private var showingEntry = false
     @AppStorage("hideLedgerAmounts") private var hidden = false
 
@@ -45,7 +46,7 @@ struct ContentView: View {
     var body: some View {
         TabView(selection: $tab) {
             NavigationStack {
-                LedgerListView(month: $month, hidden: $hidden, selectedCategory: $category, selectedDay: $day, type: $filterType,
+                LedgerListView(month: $month, search: $search, hidden: $hidden, selectedCategory: $category, selectedDay: $day, type: $filterType,
                     records: monthRecords, pending: expenses.filter(\.needsConfirmation), analytics: analytics,
                     add: { showingEntry = true })
             }
@@ -67,7 +68,16 @@ struct ContentView: View {
         }
         .tint(LedgerStyle.accent)
         .environment(\.locale, Locale(identifier: "zh_CN"))
-        .sheet(isPresented: $showingEntry) { ExpenseEntryView() }
+        .sheet(isPresented: $showingEntry) {
+            ExpenseEntryView { expense in
+                month = expense.date
+                category = nil
+                day = nil
+                filterType = "全部"
+                search = ""
+                tab = 0
+            }
+        }
         .onChange(of: month) { _, _ in category = nil; day = nil; filterType = "全部" }
     }
 }
