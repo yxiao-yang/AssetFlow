@@ -13,10 +13,12 @@ struct ContentView: View {
     @State private var filterType = "全部"
     @State private var showingEntry = false
     @AppStorage("hideLedgerAmounts") private var hidden = false
+    @AppStorage(AppAppearance.storageKey) private var appearance = AppAppearance.system.rawValue
 
     init() {
         #if DEBUG
-        _tab = State(initialValue: CommandLine.arguments.contains("--demo-charts") ? 1 :
+        _tab = State(initialValue: CommandLine.arguments.contains("--demo-settings") ? 4 :
+            CommandLine.arguments.contains("--demo-charts") ? 1 :
             CommandLine.arguments.contains("--demo-calendar") ? 2 :
             (CommandLine.arguments.contains("--demo-assets") || CommandLine.arguments.contains("--demo-term-deposits")) ? 3 : 0)
         #endif
@@ -64,6 +66,8 @@ struct ContentView: View {
             .tabItem { Label("日历", systemImage: "calendar") }.tag(2)
             NavigationStack { assetPage }
                 .tabItem { Label("资产", systemImage: "wallet.pass") }.tag(3)
+            NavigationStack { SettingsView() }
+                .tabItem { Label("设置", systemImage: "gearshape") }.tag(4)
         }
         .tint(LedgerStyle.accent)
         .environment(\.locale, Locale(identifier: "zh_CN"))
@@ -76,6 +80,7 @@ struct ContentView: View {
                 tab = 0
             }
         }
+        .preferredColorScheme((AppAppearance(rawValue: appearance) ?? .system).colorScheme)
         .onChange(of: month) { _, _ in category = nil; day = nil; filterType = "全部" }
     }
 }
