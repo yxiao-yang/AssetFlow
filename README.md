@@ -96,12 +96,32 @@ Debug 编译开启 `SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG` 后，可通过�
 ```sh
 xcrun swiftc AssetFlow/AssetMath.swift Tests/AssetMathChecks.swift -o /tmp/assetflow-asset-math
 /tmp/assetflow-asset-math
-xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetRepository.swift Tests/AssetIntegrationChecks.swift -o /tmp/assetflow-asset-integration
+xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/TermDepositMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetRepository.swift Tests/AssetIntegrationChecks.swift -o /tmp/assetflow-asset-integration
 /tmp/assetflow-asset-integration
-xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetRepository.swift Tests/AccountUpdateChecks.swift -o /tmp/assetflow-account-updates
+xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/TermDepositMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetRepository.swift Tests/AccountUpdateChecks.swift -o /tmp/assetflow-account-updates
 /tmp/assetflow-account-updates
-xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetRepository.swift Tests/CNYAccountDeletionChecks.swift -o /tmp/assetflow-account-deletion
+xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/TermDepositMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetRepository.swift Tests/CNYAccountDeletionChecks.swift -o /tmp/assetflow-account-deletion
 /tmp/assetflow-account-deletion
 ```
 
 覆盖金额与估值精度、余额快照边界、待确认收支排除、转账、截图账户匹配、旧外币排除和证券现金。Debug 启动参数 `--demo-ledger --demo-assets` 打开独立内存示例资产页面。
+
+## 同一存折里的多笔定期
+
+创建或编辑「资金账户」，开启「管理多笔定期存款」。先核对**账户总余额＝活期余额＋所有未取出的定期本金**，然后在账户详情逐笔添加本金、存入日、到期日、年利率和备注。录入已有定期只拆分账户余额，不额外增加资产。录入金额不能超过可拆分的活期余额；若总额漏录，需要先核对总余额。
+
+- 账户详情分开显示活期余额、定期本金和预计到期利息，存款按到期日排列，已结清记录保留。
+- 预计利息按「本金 × 年利率 × 实际天数 ÷ 365」估算并四舍五入到分，不计入资产和收入，不代表银行实际结算规则。
+- 到期后显示「已到期 · 未取出」，不会自动增加收入或自动转存。本版不包含到期提醒。
+- 「取出」支持整笔转入本账户活期或另一个人民币非证券账户。本金仅作为内部调整／账户间转账，实际到账利息单独记录为理财收入。提前取出也须填写银行实际利息，不能直接使用预计值。
+- 「转存」保留原记录并标为已转存，创建同一账户的新定期。实际利息先入账；新本金可以包含利息，也可以仅转存原本金，剩余资金留在活期。记录中保留前一笔存款的关联。
+- 「删除录入记录」用于纠正误录，仅删除未结清明细，总余额不变，本金归回活期；真实取出请使用「取出」。已结清记录只读，避免重复结算。
+- 普通账户转账只允许使用活期／可用现金。定期本金需先取出；核对总余额不能低于未取出的定期本金。关联账单造成活期余额为负时显示核对提示。
+- 删除账户时同步清理定期明细，账本收支及其他账户的转账记录仍保留。
+
+```sh
+xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/TermDepositMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetRepository.swift AssetFlow/TermDepositRepository.swift Tests/TermDepositChecks.swift -o /tmp/assetflow-term-checks
+/tmp/assetflow-term-checks
+```
+
+Debug 启动参数 `--demo-ledger --demo-term-deposits` 可查看独立内存中的多笔定期示例，不写入个人账本。

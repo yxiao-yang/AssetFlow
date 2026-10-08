@@ -10,6 +10,7 @@ struct AssetAccountDetail: View {
     @State private var deletionError = false
     @Query private var accounts: [AssetAccount]
     @Query(sort: \AssetBalanceSnapshot.date, order: .reverse) private var snapshots: [AssetBalanceSnapshot]
+    @Query private var deposits: [TermDeposit]
     @Query private var holdings: [StockHolding]
     @Query(sort: \AssetTransfer.date, order: .reverse) private var transfers: [AssetTransfer]
     @Query(sort: \Expense.date, order: .reverse) private var expenses: [Expense]
@@ -20,7 +21,7 @@ struct AssetAccountDetail: View {
     @State private var selectedStock: StockHolding?
     private var portfolio: AssetPortfolio {
         AssetPortfolio(accounts: accounts, snapshots: snapshots, holdings: holdings,
-            transfers: transfers, expenses: expenses)
+            transfers: transfers, expenses: expenses, deposits: deposits)
     }
     private var positions: [StockHolding] { portfolio.positions(account).sorted { $0.marketValue > $1.marketValue } }
 
@@ -49,7 +50,10 @@ struct AssetAccountDetail: View {
                             .font(.caption).foregroundStyle(.red)
                     }
                 }.padding(.vertical, 6)
-                Button(account.kind == .stocks ? "核对证券账户可用现金" : "核对当前余额") { checking = true }
+                Button(account.kind == .stocks ? "核对证券账户可用现金" : (account.managesTermDeposits ? "核对账户总余额" : "核对当前余额")) { checking = true }
+            }
+            if account.managesTermDeposits {
+                TermDepositSection(account: account, portfolio: portfolio, hidden: hidden)
             }
             if account.kind == .stocks {
                 Section("证券账户构成") {
@@ -95,11 +99,11 @@ struct AssetAccountDetail: View {
             Section("账户资料") {
                 LabeledContent("机构", value: account.institution.isEmpty ? "未填写" : account.institution)
                 if !account.lastFour.isEmpty { LabeledContent("尾号", value: account.lastFour) }
-                if account.kind == .passbook || account.maturityDate != nil {
+                if !account.managesTermDeposits && (account.kind == .passbook || account.maturityDate != nil) {
                     LabeledContent("存款类型", value: account.depositStyle)
                     if let date = account.maturityDate { LabeledContent("到期日", value: date.formatted(date: .abbreviated, time: .omitted)) }
                 }
-                if let rate = account.annualRateText {
+                if !account.managesTermDeposits, let rate = account.annualRateText {
                     LabeledContent(account.kind == .yuebao ? "七日年化（参考）" : "年利率／收益率参考", value: rate + "%")
                 }
                 if !account.note.isEmpty { Text(account.note).font(.subheadline) }
@@ -150,7 +154,7 @@ struct AssetAccountDetail: View {
             Section {
                 Button("删除账户", role: .destructive) { deleting = true }
             } footer: {
-                Text("删除账户及其持仓、余额核对记录，账本收支保留并解除关联。其他账户中的转账记录保留。")
+                Text("删除账户及其持仓、定期存款和余额核对记录，账本收支保留并解除关联。其他账户中的转账记录保留。")
             }
         }
         .navigationTitle(account.name).navigationBarTitleDisplayMode(.inline)
@@ -165,7 +169,7 @@ struct AssetAccountDetail: View {
                 catch { deletionError = true }
             }
         } message: {
-            Text("账户、持仓和余额核对记录将被删除。账本收支保留并解除关联，其他账户的转账记录和余额保留。")
+            Text("账户、持仓、定期存款和余额核对记录将被删除。账本收支保留并解除关联，其他账户的转账记录和余额保留。")
         }
         .alert("删除失败，请重试", isPresented: $deletionError) { Button("好", role: .cancel) {} }
         .sheet(isPresented: $editing) { AssetAccountEditor(existing: account) }

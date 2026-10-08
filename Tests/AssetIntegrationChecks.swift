@@ -6,7 +6,7 @@ struct AssetIntegrationChecks {
     @MainActor
     static func main() throws {
         let container = try ModelContainer(for: Expense.self, AssetAccount.self, AssetBalanceSnapshot.self,
-            StockHolding.self, AssetTransfer.self, AssetFXRate.self,
+            StockHolding.self, AssetTransfer.self, AssetFXRate.self, TermDeposit.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true))
         let context = container.mainContext
         let baseline = Date(timeIntervalSince1970: 1000)

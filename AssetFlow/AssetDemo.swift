@@ -14,8 +14,17 @@ enum AssetDemo {
         ]
         for (name, kind, amount, tail) in rows {
             let account = AssetAccount(name: name, kind: kind, lastFour: tail, createdAt: start)
+            if kind == .passbook { account.managesTermDeposits = true }
             context.insert(account)
             context.insert(AssetBalanceSnapshot(accountID: account.id, amountInCents: amount, date: start, note: "示例期初余额"))
+            if kind == .passbook {
+                context.insert(TermDeposit(accountID: account.id, name: "第一笔一年定期", principalInCents: 2000000,
+                    annualRateText: "1.5", openedAt: Calendar.current.date(byAdding: .year, value: -1, to: .now)!,
+                    maturityDate: Calendar.current.startOfDay(for: .now), note: "示例数据，未实际取出", createdAt: start))
+                context.insert(TermDeposit(accountID: account.id, name: "第二笔三年定期", principalInCents: 2500000,
+                    annualRateText: "2", openedAt: Calendar.current.date(byAdding: .month, value: -6, to: .now)!,
+                    maturityDate: Calendar.current.date(byAdding: .month, value: 30, to: .now)!, note: "示例数据", createdAt: start))
+            }
             if kind == .debitCard {
                 context.insert(AssetBalanceSnapshot(accountID: account.id, amountInCents: amount - 50000,
                     date: Calendar.current.date(byAdding: .day, value: -5, to: .now)!, note: "示例余额核对"))

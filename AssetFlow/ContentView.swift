@@ -3,6 +3,9 @@ import SwiftData
 
 struct ContentView: View {
     @Query(sort: \Expense.date, order: .reverse) private var expenses: [Expense]
+    #if DEBUG
+    @Query private var demoAccounts: [AssetAccount]
+    #endif
     @State private var month = Date()
     @State private var tab = 0
     @State private var category: String?
@@ -15,10 +18,20 @@ struct ContentView: View {
         #if DEBUG
         _tab = State(initialValue: CommandLine.arguments.contains("--demo-charts") ? 1 :
             CommandLine.arguments.contains("--demo-calendar") ? 2 :
-            CommandLine.arguments.contains("--demo-assets") ? 3 : 0)
+            (CommandLine.arguments.contains("--demo-assets") || CommandLine.arguments.contains("--demo-term-deposits")) ? 3 : 0)
         #endif
     }
 
+    @ViewBuilder
+    private var assetPage: some View {
+        #if DEBUG
+        if CommandLine.arguments.contains("--demo-term-deposits"), let account = demoAccounts.first(where: { $0.managesTermDeposits }) {
+            AssetAccountDetail(account: account)
+        } else { AssetOverview() }
+        #else
+        AssetOverview()
+        #endif
+    }
     private var analytics: LedgerAnalytics {
         LedgerAnalytics(records: expenses.map {
             LedgerRecord(amountInCents: $0.amountInCents, category: $0.category, date: $0.date,
@@ -49,7 +62,7 @@ struct ContentView: View {
                 }
             }
             .tabItem { Label("日历", systemImage: "calendar") }.tag(2)
-            NavigationStack { AssetOverview() }
+            NavigationStack { assetPage }
                 .tabItem { Label("资产", systemImage: "wallet.pass") }.tag(3)
         }
         .tint(LedgerStyle.accent)
@@ -60,5 +73,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView().modelContainer(for: [Expense.self, AssetAccount.self, AssetBalanceSnapshot.self, StockHolding.self, AssetTransfer.self, AssetFXRate.self], inMemory: true)
+    ContentView().modelContainer(for: [Expense.self, AssetAccount.self, AssetBalanceSnapshot.self, StockHolding.self, AssetTransfer.self, AssetFXRate.self, TermDeposit.self], inMemory: true)
 }

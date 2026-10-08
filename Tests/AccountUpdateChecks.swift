@@ -7,7 +7,7 @@ struct AccountUpdateChecks {
     static func main() throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: Expense.self, AssetAccount.self, AssetBalanceSnapshot.self,
-            StockHolding.self, AssetTransfer.self, AssetFXRate.self, configurations: config)
+            StockHolding.self, AssetTransfer.self, AssetFXRate.self, TermDeposit.self, configurations: config)
         let context = container.mainContext
         let start = Date(timeIntervalSince1970: 1000)
         let checked = start.addingTimeInterval(100)

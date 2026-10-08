@@ -7,6 +7,7 @@ struct AssetPortfolio {
     let holdings: [StockHolding]
     let transfers: [AssetTransfer]
     let expenses: [Expense]
+    var deposits: [TermDeposit] = []
 
     var activeAccounts: [AssetAccount] { accounts.filter { $0.archivedAt == nil && $0.currencyCode == "CNY" } }
     var engine: AssetBalanceEngine {
@@ -22,6 +23,14 @@ struct AssetPortfolio {
     }
     func balance(_ account: AssetAccount, at date: Date = .now) -> Int {
         engine.value(accountID: account.id, at: date) ?? 0
+    }
+    func termDeposits(_ account: AssetAccount) -> [TermDeposit] { deposits.filter { $0.accountID == account.id } }
+    func termPrincipal(_ account: AssetAccount) -> Int {
+        termDeposits(account).filter(\.isOutstanding).reduce(0) { $0 + $1.principalInCents }
+    }
+    func availableBalance(_ account: AssetAccount) -> Int {
+        if account.kind == .stocks { return stockCash(account) }
+        return balance(account) - termPrincipal(account)
     }
     var total: Int { activeAccounts.reduce(0) { $0 + balance($1) } }
     func lastUpdateDate(_ account: AssetAccount) -> Date {
@@ -51,7 +60,8 @@ enum AssetRepository {
             snapshots: try context.fetch(FetchDescriptor<AssetBalanceSnapshot>()),
             holdings: try context.fetch(FetchDescriptor<StockHolding>()),
             transfers: try context.fetch(FetchDescriptor<AssetTransfer>()),
-            expenses: try context.fetch(FetchDescriptor<Expense>()))
+            expenses: try context.fetch(FetchDescriptor<Expense>()),
+            deposits: try context.fetch(FetchDescriptor<TermDeposit>()))
     }
     static func deleteAccount(_ account: AssetAccount, in context: ModelContext) throws {
         do {
@@ -59,6 +69,7 @@ enum AssetRepository {
             for expense in portfolio.expenses where expense.accountID == account.id { expense.accountID = nil }
             for snapshot in portfolio.snapshots where snapshot.accountID == account.id { context.delete(snapshot) }
             for holding in portfolio.holdings where holding.accountID == account.id { context.delete(holding) }
+            for deposit in portfolio.deposits where deposit.accountID == account.id { context.delete(deposit) }
             // Retain transfers: removing them would change balances and history in the surviving accounts.
             context.delete(account)
             try context.save()

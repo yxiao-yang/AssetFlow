@@ -46,6 +46,7 @@ final class AssetAccount {
     var kindRaw: String
     var currencyCode: String = "CNY"
     var depositStyle: String = "活期"
+    var managesTermDeposits: Bool = false
     var annualRateText: String?
     var maturityDate: Date?
     var institution: String
@@ -119,5 +120,39 @@ final class AssetFXRate {
     var source: String
     init(rateText: String, date: Date = .now, source: String = "手动录入") {
         self.rateText = rateText; self.date = date; self.source = source
+    }
+}
+
+@Model
+final class TermDeposit {
+    var id: UUID = UUID()
+    var accountID: UUID
+    var name: String
+    var principalInCents: Int
+    var annualRateText: String
+    var openedAt: Date
+    var maturityDate: Date
+    var note: String
+    var createdAt: Date
+    var updatedAt: Date
+    var closedAt: Date?
+    var closureKind: String?
+    var settledInterestInCents: Int?
+    var originDepositID: UUID?
+
+    init(accountID: UUID, name: String, principalInCents: Int, annualRateText: String,
+         openedAt: Date, maturityDate: Date, note: String = "", createdAt: Date = .now) {
+        self.accountID = accountID; self.name = name; self.principalInCents = principalInCents
+        self.annualRateText = annualRateText; self.openedAt = openedAt; self.maturityDate = maturityDate
+        self.note = note; self.createdAt = createdAt; self.updatedAt = createdAt
+    }
+    var isOutstanding: Bool { closedAt == nil }
+    func status(at date: Date = .now) -> String {
+        if closedAt != nil { return closureKind == "renewed" ? "已转存" : "已取出" }
+        return Calendar.current.startOfDay(for: date) >= Calendar.current.startOfDay(for: maturityDate) ? "已到期 · 未取出" : "存续中"
+    }
+    var estimatedInterest: Int {
+        TermDepositMath.estimatedInterest(principal: principalInCents, rate: annualRateText,
+            start: openedAt, end: maturityDate) ?? 0
     }
 }

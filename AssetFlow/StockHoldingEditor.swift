@@ -139,7 +139,7 @@ struct AssetTransferEditor: View {
                 Section("实际到账金额") {
                     TextField("转账金额（人民币）", text: $amount).keyboardType(.decimalPad)
                     TextField("备注（选填）", text: $note)
-                    Text("转账不计入日常收支。证券账户仅转入、转出可用现金。")
+                    Text("转账不计入日常收支。证券账户仅转入、转出可用现金；定期本金需先取出，才能转账。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }.navigationTitle("账户间转账").navigationBarTitleDisplayMode(.inline)
@@ -157,7 +157,7 @@ struct AssetTransferEditor: View {
         guard let from, let to, let cents = AssetMath.cents(amount, allowZero: false) else { return }
         do {
             let portfolio = try AssetRepository.fetch(context)
-            let available = from.kind == .stocks ? portfolio.stockCash(from) : portfolio.balance(from)
+            let available = portfolio.availableBalance(from)
             guard available >= cents else { error = "转出金额超过已记录的可用余额，请先核对账户。"; return }
             context.insert(AssetTransfer(fromID: from.id, toID: to.id, amountInCents: cents,
                 receivedInCents: cents, note: note))

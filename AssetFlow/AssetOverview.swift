@@ -5,6 +5,7 @@ import Charts
 struct AssetOverview: View {
     @Query(sort: \AssetAccount.createdAt) private var accounts: [AssetAccount]
     @Query private var snapshots: [AssetBalanceSnapshot]
+    @Query private var deposits: [TermDeposit]
     @Query private var holdings: [StockHolding]
     @Query private var transfers: [AssetTransfer]
     @Query private var expenses: [Expense]
@@ -14,7 +15,7 @@ struct AssetOverview: View {
 
     private var portfolio: AssetPortfolio {
         AssetPortfolio(accounts: accounts, snapshots: snapshots, holdings: holdings,
-            transfers: transfers, expenses: expenses)
+            transfers: transfers, expenses: expenses, deposits: deposits)
     }
     private var sorted: [AssetAccount] {
         portfolio.activeAccounts.sorted { portfolio.balance($0) > portfolio.balance($1) }
