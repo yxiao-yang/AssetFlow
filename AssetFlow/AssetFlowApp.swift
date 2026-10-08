@@ -7,6 +7,6 @@ struct AssetFlowApp: App {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(for: Expense.self)
+        .modelContainer(AssetStore.container)
     }
 }
