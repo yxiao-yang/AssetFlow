@@ -1,5 +1,4 @@
 import AppIntents
-import CryptoKit
 import Foundation
 import SwiftData
 import Vision
@@ -36,57 +35,32 @@ struct RecordPaymentScreenshotIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let data = screenshot.data
+        let payment = try await PaymentScreenshotRecognizer.recognize(screenshot.data)
+        let context = ModelContext(AssetStore.container)
+        let outcome = try ScreenshotLedgerService.save(payment, screenshotData: screenshot.data, in: context)
+        guard case .saved(let expense) = outcome else {
+            return .result(dialog: "这张截图已处理，没有重复记账。")
+        }
+        if expense.needsConfirmation {
+            return .result(dialog: "截图已保存为待确认，暂未计入收支。可稍后在资产流核对。")
+        }
+        let amount = (Decimal(expense.amountInCents) / 100).formatted(.currency(code: "CNY"))
+        if expense.isIncome {
+            return .result(dialog: "已记录收入 \(amount)，\(expense.category)。")
+        }
+        return .result(dialog: "已记录支出 \(amount)，\(expense.category)。")
+    }
+}
+
+enum PaymentScreenshotRecognizer {
+    static func recognize(_ data: Data) async throws -> RecognizedPayment {
         let recognized = try await Task.detached(priority: .userInitiated) {
             try PaymentOCR.recognize(data)
         }.value
         var payment = PaymentParser.parse(recognized.text)
-        if recognized.confidence < 0.85 { payment.reasons.append("金额或日期识别可信度偏低") }
-        let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-        let context = ModelContext(AssetStore.container)
-        let existing = try context.fetch(FetchDescriptor<Expense>())
-        let previous = existing.first { $0.screenshotHash == hash }
-        if let previous, !previous.needsConfirmation {
-            return .result(dialog: "这张截图已处理，没有重复记账。")
+        if recognized.confidence < PaymentOCRText.reviewConfidenceThreshold {
+            payment.reasons.append("金额或日期识别可信度偏低")
         }
-        // A pending record can be recognized again after parser updates without creating a duplicate.
-        let otherRecords = existing.filter { $0 !== previous }
-        if let id = payment.transactionID, otherRecords.contains(where: {
-            $0.transactionID == id && $0.paymentChannel == payment.paymentChannel
-        }) {
-            // Keep both source images available for review; never silently overwrite an earlier entry.
-            payment.reasons.append("交易单号与已有记录相同，请核对重复记录")
-        } else if otherRecords.contains(where: {
-            $0.merchant == payment.merchant && payment.merchant != nil &&
-            $0.amountInCents == payment.amountInCents &&
-            abs($0.date.timeIntervalSince(payment.date ?? .now)) < 120
-        }) {
-            payment.reasons.append("附近时间有同商户同金额记录，可能重复")
-        }
-        let expense = previous ?? Expense(amountInCents: payment.amountInCents ?? 0,
-            category: payment.category, note: payment.merchant ?? "截图记账", date: payment.date ?? .now)
-        expense.amountInCents = payment.amountInCents ?? 0
-        expense.category = payment.category
-        expense.note = payment.merchant ?? "截图记账"
-        expense.date = payment.date ?? .now
-        let accounts = try context.fetch(FetchDescriptor<AssetAccount>())
-        expense.accountID = AssetRepository.matchingAccount(method: payment.paymentMethod, in: accounts)?.id
-        expense.merchant = payment.merchant
-        expense.paymentChannel = payment.paymentChannel
-        expense.paymentMethod = payment.paymentMethod
-        expense.transactionID = payment.transactionID
-        expense.rawText = payment.rawText
-        expense.screenshotHash = hash
-        expense.screenshotData = data
-        expense.needsConfirmation = !payment.reasons.isEmpty
-        expense.reviewReason = payment.reasons.joined(separator: "；")
-        expense.dateIsEstimated = payment.date == nil
-        if previous == nil { context.insert(expense) }
-        try context.save()
-        if expense.needsConfirmation {
-            return .result(dialog: "截图已保存为待确认，暂未计入支出。可稍后在资产流核对。")
-        }
-        let amount = (Decimal(expense.amountInCents) / 100).formatted(.currency(code: "CNY"))
-        return .result(dialog: "已记录支出 \(amount)，\(expense.category)。")
+        return payment
     }
 }

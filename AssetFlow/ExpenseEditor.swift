@@ -139,6 +139,8 @@ struct ExpenseDetailView: View {
     @State private var editing = false
     @State private var deleting = false
     @State private var deletionError = false
+    @State private var recognizing = false
+    @State private var recognitionMessage: String?
 
     var body: some View {
         List {
@@ -175,6 +177,10 @@ struct ExpenseDetailView: View {
                 }
             }
             Section {
+                if expense.needsConfirmation, expense.screenshotData != nil {
+                    Button(recognizing ? "正在重新识别…" : "重新识别原图", action: recognizeAgain)
+                        .disabled(recognizing)
+                }
                 Button(expense.needsConfirmation ? "核对并入账" : "编辑记录") { editing = true }
                 Button("删除记录", role: .destructive) { deleting = true }
             }
@@ -189,8 +195,28 @@ struct ExpenseDetailView: View {
                 catch { context.rollback(); deletionError = true }
             }
         }
+        .alert("重新识别结果", isPresented: Binding(get: { recognitionMessage != nil }, set: { if !$0 { recognitionMessage = nil } })) {
+            Button("好", role: .cancel) { recognitionMessage = nil }
+        } message: { Text(recognitionMessage ?? "") }
         .alert("删除失败，请重试", isPresented: $deletionError) {
             Button("好", role: .cancel) {}
         }
     }
+    private func recognizeAgain() {
+        guard !recognizing, let data = expense.screenshotData else { return }
+        recognizing = true
+        Task { @MainActor in
+            defer { recognizing = false }
+            do {
+                let payment = try await PaymentScreenshotRecognizer.recognize(data)
+                let outcome = try ScreenshotLedgerService.save(payment, screenshotData: data, in: context, existingRecord: expense)
+                switch outcome {
+                case .duplicate: recognitionMessage = "这条记录已确认，未重复入账。"
+                case .saved(let record):
+                    recognitionMessage = record.needsConfirmation ? "识别完成，仍需核对：" + (record.reviewReason ?? "请核对账单") : "已更新原记录并计入" + (record.isIncome ? "收入。" : "支出。")
+                }
+            } catch { recognitionMessage = "重新识别失败，请重试。" }
+        }
+    }
+
 }

@@ -150,3 +150,27 @@ xcrun swiftc AssetFlow/PaymentParser.swift AssetFlow/PaymentOCRText.swift Tests/
 ```
 
 原有待确认记录不会在升级时自动重算；再次提交完全相同的截图会重新解析该条记录，已确认记录仍去重。
+
+
+常见支付宝账单识别：
+
+- 顶部交易名称与「收款方全称」分开解析；店铺显示名优先用于流水商户名称。
+- 「余额宝＋收益发放」识别为收入／理财收益，支持没有正负号的收益金额，入账账户匹配余额宝。普通退款、转账、充值仍进入核对。
+- Vision 的 0.5 识别分数在这些原图中对应有效金额和日期，不等于 50% 的入账准确率；数值字段低于 0.5 才追加低可信度原因，同时仍验证完整日期、金额歧义、交易状态与特殊交易。
+- 本机已用四张用户原图验证小荷包消费、余额宝收益、商店消费和个人收款码消费；这不是对所有账单准确率的估计。
+
+余额宝原图检查参数：`/tmp/assetflow-ocr-checks /path/to/screenshot.png --yuebao-income`；零食店与板面原图分别使用 `--shop` 和 `--noodle`。
+
+
+微信账单补充：支持「2026年10月7日 15:01:51」格式、「商户全称」和跨行商品描述；分类使用商品说明与商户名共同判断，商品说明保存在备注中，不能确定的分类保留「其他」。类别是否确定不会单独阻止已完整识别的账单入账。
+
+已保存的待确认记录可在详情点击「重新识别原图」，原图仍在本机处理；更新该条记录，不新增一笔。已确认记录保持去重。当前未接入云端 AI，也未将截图发送到远端。
+
+识别入账与原图重试检查：
+
+```bash
+xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/TermDepositMath.swift AssetFlow/AssetModels.swift AssetFlow/AssetHistoryRange.swift AssetFlow/AssetRepository.swift AssetFlow/PaymentParser.swift AssetFlow/ScreenshotLedgerService.swift Tests/ScreenshotLedgerChecks.swift -o /tmp/assetflow-screenshot-ledger
+/tmp/assetflow-screenshot-ledger
+```
+
+微信原图检查参数：`/tmp/assetflow-ocr-checks /path/to/screenshot.png --wechat`。真实原图检查均在本机进行，测试仓库不保存用户截图。

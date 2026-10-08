@@ -12,7 +12,7 @@ struct PaymentOCRChecks {
         precondition(assembled.text == "-10.00\n创建时间 2026-10-08 09:37:21\n更多")
         precondition(assembled.confidence == 1)
         let uncertainAmount = PaymentOCRLine(text: "-10.00", confidence: 0.3, bounds: amount.bounds)
-        precondition(PaymentOCRText.assemble([label, value, uncertainAmount, footer]).confidence < 0.85)
+        precondition(PaymentOCRText.assemble([label, value, uncertainAmount, footer]).confidence < PaymentOCRText.reviewConfidenceThreshold)
         precondition(PaymentOCRText.assemble([]).text.isEmpty)
         if CommandLine.arguments.count > 1 {
             let request = VNRecognizeTextRequest()
@@ -26,11 +26,30 @@ struct PaymentOCRChecks {
             }
             let result = PaymentOCRText.assemble(lines)
             let payment = PaymentParser.parse(result.text, now: Date(timeIntervalSince1970: 1_900_000_000))
-            precondition(payment.amountInCents == 1000)
+            if CommandLine.arguments.dropFirst(2).contains("--yuebao-income") {
+                precondition(payment.amountInCents == 16 && payment.isIncome)
+                precondition(payment.merchant == "余额宝" && payment.category == "理财收益")
+                precondition(payment.paymentMethod == "余额宝" && payment.paymentChannel == "支付宝")
+            } else if CommandLine.arguments.dropFirst(2).contains("--wechat") {
+                precondition(payment.amountInCents == 27500 && !payment.isIncome)
+                precondition(payment.merchant == "美团" && payment.category == "娱乐")
+                precondition(payment.paymentMethod == "零钱" && payment.paymentChannel == "微信")
+                precondition(payment.productDescription?.contains("SPA") == true)
+            } else if CommandLine.arguments.dropFirst(2).contains("--shop") {
+                precondition(payment.amountInCents == 420 && !payment.isIncome)
+                precondition(payment.merchant == "好想来零食乐园" && payment.category == "餐饮")
+                precondition(payment.paymentMethod == "招商银行信用卡(5550)")
+            } else if CommandLine.arguments.dropFirst(2).contains("--noodle") {
+                precondition(payment.amountInCents == 1500 && !payment.isIncome)
+                precondition(payment.merchant == "老高亚笛板面" && payment.category == "餐饮")
+                precondition(payment.paymentMethod == "招商银行储蓄卡(1373)")
+            } else {
+                precondition(payment.amountInCents == 1000 && !payment.isIncome)
+                precondition(payment.merchant?.contains("支付宝小荷包") == true)
+                precondition(payment.paymentMethod == "招商银行储蓄卡(1373)")
+            }
             precondition(payment.date != nil)
-            precondition(payment.merchant?.contains("支付宝小荷包") == true)
-            precondition(payment.paymentMethod == "招商银行储蓄卡(1373)")
-            precondition(payment.reasons.isEmpty && result.confidence >= 0.85)
+            precondition(payment.reasons.isEmpty && result.confidence >= PaymentOCRText.reviewConfidenceThreshold)
             print("Provided screenshot: OCR and parsing checks passed")
         }
         print("OCR layout and confidence checks passed")
