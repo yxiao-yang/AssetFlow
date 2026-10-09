@@ -13,6 +13,8 @@ struct PaymentOCRChecks {
         precondition(assembled.confidence == 1)
         let uncertainAmount = PaymentOCRLine(text: "-10.00", confidence: 0.3, bounds: amount.bounds)
         precondition(PaymentOCRText.assemble([label, value, uncertainAmount, footer]).confidence < PaymentOCRText.reviewConfidenceThreshold)
+        let uncertainDate = PaymentOCRLine(text: "２０２６ 年 １０ 月 ７ 日 １５：０１：５１", confidence: 0.3, bounds: value.bounds)
+        precondition(PaymentOCRText.assemble([label, uncertainDate, amount]).confidence < PaymentOCRText.reviewConfidenceThreshold)
         precondition(PaymentOCRText.assemble([]).text.isEmpty)
         if CommandLine.arguments.count > 1 {
             let request = VNRecognizeTextRequest()
@@ -35,6 +37,9 @@ struct PaymentOCRChecks {
                 precondition(payment.merchant == "美团" && payment.category == "娱乐")
                 precondition(payment.paymentMethod == "零钱" && payment.paymentChannel == "微信")
                 precondition(payment.productDescription?.contains("SPA") == true)
+                let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: payment.date!)
+                precondition(components.year == 2026 && components.month == 10 && components.day == 7)
+                precondition(components.hour == 15 && components.minute == 1 && components.second == 51)
             } else if CommandLine.arguments.dropFirst(2).contains("--shop") {
                 precondition(payment.amountInCents == 420 && !payment.isIncome)
                 precondition(payment.merchant == "好想来零食乐园" && payment.category == "餐饮")

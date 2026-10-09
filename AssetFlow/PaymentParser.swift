@@ -17,7 +17,8 @@ struct RecognizedPayment {
 /// Only explicit source fields are extracted. Category is a rule-based suggestion.
 enum PaymentParser {
     static func parse(_ text: String, now: Date = .now) -> RecognizedPayment {
-        let normalized = text.replacingOccurrences(of: "：", with: ":")
+        let normalized = text.folding(options: .widthInsensitive, locale: Locale(identifier: "en_US_POSIX"))
+            .replacingOccurrences(of: "：", with: ":")
             .replacingOccurrences(of: "（", with: "(").replacingOccurrences(of: "）", with: ")")
             .replacingOccurrences(of: "−", with: "-").replacingOccurrences(of: "－", with: "-")
             .replacingOccurrences(of: "–", with: "-")
@@ -98,6 +99,8 @@ enum PaymentParser {
         } else {
             candidates = lines.flatMap { line -> [String] in
                 if ["优惠", "折扣", "红包", "手续费", "余额", "原价"].contains(where: line.contains) { return [] }
+                // Spaced OCR date separators (2026 - 10 - 07) are not negative amounts.
+                if line.range(of: #"\d{4}\s*(?:[-/]|年)\s*\d{1,2}\s*(?:[-/]|月)\s*\d{1,2}"#, options: .regularExpression) != nil { return [] }
                 return matches(amountPattern, in: line)
             }
         }
@@ -109,13 +112,18 @@ enum PaymentParser {
         if amounts.count == 1 { result.amountInCents = amounts.first }
         else { result.reasons.append(amounts.isEmpty ? "没有识别到明确的交易金额" : "页面出现多个不同金额") }
 
-        let datePattern = #"(\d{4}(?:[-/]|年)\d{1,2}(?:[-/]|月)\d{1,2}日?\s+\d{1,2}:\d{2}(?::\d{2})?)"#
+        // Vision can insert spaces around Chinese date units/colons, or split the time onto a new line.
+        let datePattern = #"(\d{4}\s*(?:[-/]|年)\s*\d{1,2}\s*(?:[-/]|月)\s*\d{1,2}(?:\s*日\s*|\s+|T)\d{1,2}\s*:\s*\d{2}(?:\s*:\s*\d{2})?)(?![\d:])"#
         let dateField = field(["支付时间", "付款时间", "交易时间", "创建时间"])
         let dateText = dateField.flatMap { matches(datePattern, in: $0).first }
             ?? matches(datePattern, in: normalized).first
         if let dateText {
-            let dateText = dateText.replacingOccurrences(of: "年", with: "-")
-                .replacingOccurrences(of: "月", with: "-").replacingOccurrences(of: "日", with: "")
+            let dateText = dateText
+                .replacingOccurrences(of: #"\s*([年月日:/-])\s*"#, with: "$1", options: .regularExpression)
+                .replacingOccurrences(of: "年", with: "-")
+                .replacingOccurrences(of: "月", with: "-").replacingOccurrences(of: "日", with: " ")
+                .replacingOccurrences(of: "T", with: " ")
+                .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             for format in ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyy/MM/dd HH:mm:ss", "yyyy/MM/dd HH:mm"] {
                 let formatter = DateFormatter()
                 formatter.locale = Locale(identifier: "en_US_POSIX")

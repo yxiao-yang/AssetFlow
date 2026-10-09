@@ -61,6 +61,24 @@ struct ParserChecks {
         precondition(wx.paymentMethod == "零钱" && wx.category == "娱乐")
         precondition(wx.productDescription?.contains("养生SPA") == true)
         precondition(wx.productDescription?.contains("科技有限公司") == false)
+        let dateVariants = [
+            "2026 年 10 月 7 日 15 : 01 : 51",
+            "2026年10月7日15:01:51",
+            "2026年10月7日\n15:01:51",
+            "２０２６年１０月７日 １５：０１：５１",
+            "2026 - 10 - 07 15 : 01 : 51",
+            "2026/10/07\n15:01:51",
+            "2026-10-07T15:01:51"
+        ]
+        for variant in dateVariants {
+            let parsed = PaymentParser.parse(wechat.replacingOccurrences(of: "2026年10月7日 15:01:51", with: variant), now: now)
+            precondition(parsed.date == wx.date, "Failed date variant: " + variant)
+            precondition(parsed.reasons.isEmpty, variant + " " + parsed.reasons.joined(separator: ","))
+        }
+        for invalid in ["2026年13月7日 15:01:51", "2026年2月30日 15:01:51", "2026年10月7日 25:01:51", "2026年10月7日 15:01:99"] {
+            precondition(PaymentParser.parse(wechat.replacingOccurrences(of: "2026年10月7日 15:01:51", with: invalid), now: now).date == nil)
+        }
+        precondition(PaymentParser.parse(wechat, now: wx.date!.addingTimeInterval(-301)).date == nil)
         print("Payment parser: all checks passed")
     }
 }

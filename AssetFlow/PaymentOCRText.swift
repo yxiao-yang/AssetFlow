@@ -20,9 +20,10 @@ enum PaymentOCRText {
         }
         let text = rows.map { $0.sorted { $0.bounds.minX < $1.bounds.minX }.map(\.text).joined(separator: " ") }.joined(separator: "\n")
         // Header icons and small footer labels must not veto clearly recognized numeric fields.
-        let critical = lines.filter {
-            $0.text.range(of: #"^\s*[¥￥+−－–-]?\s*\d+(?:,\d{3})*(?:\.\d{1,2})\s*$"#, options: .regularExpression) != nil ||
-            $0.text.range(of: #"\d{4}(?:[-/]|年)\d{1,2}(?:[-/]|月)\d{1,2}日?"#, options: .regularExpression) != nil
+        let critical = lines.filter { line in
+            let text = line.text.folding(options: .widthInsensitive, locale: Locale(identifier: "en_US_POSIX"))
+            return text.range(of: #"^\s*[¥￥+−－–-]?\s*\d+(?:,\d{3})*(?:\.\d{1,2})\s*$"#, options: .regularExpression) != nil ||
+            text.range(of: #"\d{4}\s*(?:[-/]|年)\s*\d{1,2}\s*(?:[-/]|月)\s*\d{1,2}\s*日?"#, options: .regularExpression) != nil
         }
         return (text, critical.map(\.confidence).min() ?? 1)
     }
