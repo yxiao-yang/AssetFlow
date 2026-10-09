@@ -52,6 +52,10 @@ struct SettingsView: View {
                     Label("截图记账快捷指令", systemImage: "camera.viewfinder")
                 }
             }
+            Section("关于") {
+                LabeledContent("版本号", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
+                LabeledContent("构建号", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—")
+            }
         }
         .navigationTitle("设置")
         .navigationBarTitleDisplayMode(.inline)
