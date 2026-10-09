@@ -185,3 +185,25 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer python3 Tests/run-ios-u
 ```
 
 测试脚本生成独立 Xcode 测试工程，使用不同的 App bundle ID 和内存示例账本，不改动真实账本或项目签名配置。覆盖系统白天／夜间下设置页即时恢复跟随系统，以及带原图的待确认记录连续进入、滚动、返回和删除最后一笔；结束时恢复模拟器原外观。日志和截图保存在脚本输出的临时目录。
+
+
+## SideStore 安装与应用内检查更新
+
+设置 → 关于 → 检查更新读取 GitHub Releases 最新版本的 `update.json`，比较版本号与构建号并校验最低 iOS 版本。发现新版后可下载 IPA 或查看发布说明；GitHub 不可访问时显示重试提示。此请求不包含账本、截图或账户信息。
+
+下载 IPA 保存到 iPhone「文件」，再进入 SideStore → My Apps → + 导入。使用原 Apple 账号并保留旧应用，覆盖安装后检查原账本。应用不能自行完成 SideStore 的签名与安装；Refresh 是续签，不是下载新版。不同手机仍各自保存本地数据。
+
+发布流程（需要仓库写入权限和本机 GitHub Git 凭据）：
+
+1. 修改工程中的 `MARKETING_VERSION` 和 `CURRENT_PROJECT_VERSION`，每次发布递增版本号。
+2. 运行 `bash Scripts/build-ipa.sh`，生成未签名的真机 IPA 和版本信息。无需上传 Apple 证书，SideStore 在手机上签名。
+3. 在 `build/release/update.json` 中填写 `notes` 更新说明。
+4. 提交源代码，创建对应的 `v版本号` tag，并将分支及 tag 推送到 GitHub。
+5. 运行 `python3 Scripts/publish-release.py build/release`，先创建草稿、上传 IPA 和版本信息，成功后再公开发布。重复发布同一版本会拒绝覆盖。
+
+GitHub Releases 中的 IPA 才是下载文件，不将 IPA 提交进 Git 历史。更新逻辑检查：
+
+```sh
+xcrun swiftc AssetFlow/AppUpdateService.swift Tests/AppUpdateChecks.swift -o /tmp/assetflow-update-checks
+/tmp/assetflow-update-checks
+```

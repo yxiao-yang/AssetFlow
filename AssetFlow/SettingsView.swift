@@ -55,6 +55,9 @@ struct SettingsView: View {
             Section("关于") {
                 LabeledContent("版本号", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
                 LabeledContent("构建号", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—")
+                NavigationLink { AppUpdateView() } label: {
+                    Label("检查更新", systemImage: "arrow.down.circle")
+                }
             }
         }
         .navigationTitle("设置")
