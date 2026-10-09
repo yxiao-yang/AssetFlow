@@ -6,9 +6,9 @@ struct ShortcutSetupView: View {
     var body: some View {
         List {
             Section {
-                Label("支付后轻点背面，截图识别入账", systemImage: "camera.viewfinder")
+                Label("支付后轻点背面，选分类记账", systemImage: "camera.viewfinder")
                     .font(.headline)
-                Text("在微信或支付宝账单详情页触发。截图和文字识别都在本机完成；信息不完整时进入待确认。")
+                Text("在微信或支付宝账单详情页触发。截图和文字识别都在本机完成，弹窗选择分类后入账；信息不完整时进入待确认。")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             Section("1 · 创建截图记账") {
@@ -31,10 +31,10 @@ struct ShortcutSetupView: View {
                 }.padding(.vertical, 4)
                 VStack(alignment: .leading, spacing: 8) {
                     Label("识别支付截图并记账", systemImage: "2.circle")
-                    Text("搜索「资产流」或「AssetFlow」，添加此动作。将「支付截图」参数设为上一步的「截屏」结果，完成后保存。")
+                    Text("搜索「资产流」或「AssetFlow」，添加此动作。将「支付截图」参数设为上一步的「截屏」结果。「分类」留空，运行时会弹出选择；填入分类则每次使用固定分类。完成后保存。")
                         .font(.subheadline).foregroundStyle(.secondary)
                 }.padding(.vertical, 4)
-                Text("不要选择「每次询问」或手动选照片，否则每次记账都会多一步操作。")
+                Text("「支付截图」不要选择「每次询问」或手动选照片，否则每次记账都会多一步操作。")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("3 · 绑定轻点背面") {
@@ -43,7 +43,7 @@ struct ShortcutSetupView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("4 · 试记一笔") {
-                Text("打开一笔微信或支付宝账单详情，确保金额、商户、支付时间和扣款方式清晰，再轻点背面触发。第一次使用按系统提示授权。")
+                Text("打开一笔微信或支付宝账单详情，确保金额、商户、支付时间和扣款方式清晰，再轻点背面触发。在弹窗中选择分类后入账，取消则不保存。第一次使用按系统提示授权。")
                 Text("返回资产流查看明细或「截图待确认」，核对日期、金额和关联账户。")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
