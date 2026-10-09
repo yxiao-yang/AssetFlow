@@ -15,6 +15,8 @@ with zipfile.ZipFile(ipa) as archive:
     assert roots == {'AssetFlow.app'}, 'Payload must contain exactly one app bundle'
     info = plistlib.loads(archive.read('Payload/AssetFlow.app/Info.plist'))
     assert info['CFBundleIdentifier'] == 'com.modest.AssetFlow'
+    app_name = info.get('CFBundleDisplayName') or info.get('CFBundleName', '')
+    assert app_name and app_name.isascii(), 'SideStore appIdName must use an ASCII application name'
     assert info['CFBundleSupportedPlatforms'] == ['iPhoneOS']
     assert archive.read('Payload/AssetFlow.app/AssetFlow')[:4] == bytes.fromhex('cffaedfe')
 version = info['CFBundleShortVersionString']
