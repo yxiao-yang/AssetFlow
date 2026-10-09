@@ -55,6 +55,8 @@ struct SettingsView: View {
         }
         .navigationTitle("设置")
         .navigationBarTitleDisplayMode(.inline)
+        // A sheet has its own presentation boundary and must update its preference directly.
+        .preferredColorScheme((AppAppearance(rawValue: appearance) ?? .system).colorScheme)
     }
 }
 
