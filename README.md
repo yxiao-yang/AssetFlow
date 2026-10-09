@@ -199,7 +199,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer python3 Tests/run-ios-u
 2. 运行 `bash Scripts/build-ipa.sh`，生成未签名的真机 IPA 和版本信息。无需上传 Apple 证书，SideStore 在手机上签名。
 3. 在 `build/release/update.json` 中填写 `notes` 更新说明。
 4. 提交源代码，创建对应的 `v版本号` tag，并将分支及 tag 推送到 GitHub。
-5. 运行 `python3 Scripts/publish-release.py build/release`，先创建草稿、上传 IPA 和版本信息，成功后再公开发布。重复发布同一版本会拒绝覆盖。
+5. 运行 `python3 Scripts/publish-release.py build/release`，先创建草稿、上传 IPA 和版本信息，成功后再公开发布。重复发布同一版本会拒绝覆盖。如果上传中断并留下草稿，可追加 `--resume-draft` 继续；已有文件必须与本地 SHA256 一致，公开版本不会被覆盖。
 
 GitHub Releases 中的 IPA 才是下载文件，不将 IPA 提交进 Git 历史。更新逻辑检查：
 

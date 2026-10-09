@@ -3,6 +3,7 @@
 Uses Git's configured GitHub credential helper without printing or saving secrets.
 """
 import json
+import hashlib
 import os
 import subprocess
 import sys
@@ -30,21 +31,38 @@ def call(url, method='GET', data=None, content_type='application/json'):
     with urllib.request.urlopen(request, timeout=60) as response:
         return json.load(response)
 
-# Refuse to publish an unpushed tag or replace an existing release silently.
+# An interrupted upload stays a draft. Resume only when explicitly requested.
 call(f'{base}/git/ref/tags/{tag}')
-try:
-    call(f'{base}/releases/tags/{tag}')
-except urllib.error.HTTPError as error:
-    if error.code != 404:
-        raise
+existing = next((r for r in call(f'{base}/releases?per_page=100') if r['tag_name'] == tag), None)
+if existing:
+    if not existing['draft'] or '--resume-draft' not in sys.argv[2:]:
+        raise SystemExit(f'Release {tag} already exists. Only an unfinished draft can be resumed with --resume-draft.')
+    release = existing
 else:
-    raise SystemExit(f'Release {tag} already exists; inspect it before changing any assets.')
-release = call(f'{base}/releases', 'POST', {'tag_name': tag, 'name': f"AssetFlow {manifest['version']}",
-               'body': manifest['notes'] + '\n\n下载 AssetFlow.ipa，保存到文件，然后通过 SideStore 导入。使用原账号覆盖安装，不要删除已有应用。',
-               'draft': True, 'prerelease': False})
+    release = call(f'{base}/releases', 'POST', {'tag_name': tag, 'name': f"AssetFlow {manifest['version']}",
+                   'body': manifest['notes'] + '\n\n下载 AssetFlow.ipa，保存到文件，然后通过 SideStore 导入。使用原账号覆盖安装，不要删除已有应用。',
+                   'draft': True, 'prerelease': False})
 upload = release['upload_url'].split('{')[0]
 assert upload.startswith('https://uploads.github.com/'), 'Unexpected GitHub upload host'
 for name, mime in [('AssetFlow.ipa', 'application/octet-stream'), ('update.json', 'application/json')]:
-    call(f'{upload}?name={name}', 'POST', (folder / name).read_bytes(), mime)
+    file = folder / name
+    prior = next((a for a in release.get('assets', []) if a['name'] == name), None)
+    if prior:
+        digest = 'sha256:' + hashlib.sha256(file.read_bytes()).hexdigest()
+        if prior['state'] != 'uploaded' or prior.get('digest') != digest:
+            raise SystemExit(f'Existing {name} differs or is incomplete. Inspect the draft; no asset was replaced.')
+        continue
+    # Pass credentials via stdin, not process arguments or a file. Do not follow redirects.
+    config = '\n'.join(['url = ' + json.dumps(f'{upload}?name={name}'), 'request = "POST"',
+                        'header = ' + json.dumps('Authorization: Bearer ' + fields['password']),
+                        'header = ' + json.dumps('Content-Type: ' + mime),
+                        'data-binary = ' + json.dumps('@' + str(file.resolve()))])
+    result = subprocess.run(['curl', '--config', '-', '--fail', '--silent', '--show-error',
+                             '--connect-timeout', '20', '--max-time', '60'],
+                            input=config, text=True, capture_output=True, timeout=65)
+    if result.returncode:
+        raise SystemExit(f'Upload failed for {name}. The release remains a draft; retry with --resume-draft. ' + result.stderr)
+    asset = json.loads(result.stdout)
+    assert asset['state'] == 'uploaded' and asset['size'] == file.stat().st_size
 published = call(f"{base}/releases/{release['id']}", 'PATCH', {'draft': False, 'make_latest': 'true'})
 print('Published:', published['html_url'])
