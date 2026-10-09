@@ -136,6 +136,7 @@ struct ExpenseDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var accounts: [AssetAccount]
     let expense: Expense
+    var onDeleted: (() -> Void)? = nil
     @State private var editing = false
     @State private var deleting = false
     @State private var deletionError = false
@@ -191,8 +192,10 @@ struct ExpenseDetailView: View {
         .confirmationDialog("删除此记录及其截图？", isPresented: $deleting, titleVisibility: .visible) {
             Button("删除", role: .destructive) {
                 context.delete(expense)
-                do { try context.save(); dismiss() }
-                catch { context.rollback(); deletionError = true }
+                do {
+                    try context.save()
+                    if let onDeleted { onDeleted() } else { dismiss() }
+                } catch { context.rollback(); deletionError = true }
             }
         }
         .alert("重新识别结果", isPresented: Binding(get: { recognitionMessage != nil }, set: { if !$0 { recognitionMessage = nil } })) {

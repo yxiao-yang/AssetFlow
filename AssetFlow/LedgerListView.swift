@@ -10,7 +10,7 @@ struct LedgerListView: View {
     let pending: [Expense]
     let analytics: LedgerAnalytics
     let add: () -> Void
-    @State private var showingPending = false
+    let openPending: () -> Void
 
     private var filtered: [Expense] {
         records.filter { row in
@@ -31,7 +31,7 @@ struct LedgerListView: View {
                 summary
                 if !pending.isEmpty {
                     Button {
-                        showingPending = true
+                        openPending()
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "tray.fill").foregroundStyle(.orange)
@@ -76,7 +76,7 @@ struct LedgerListView: View {
                     let rows = filtered.filter { Calendar.current.isDate($0.date, inSameDayAs: date) }
                     Section {
                         ForEach(rows) { row in
-                            NavigationLink { ExpenseDetailView(expense: row) } label: {
+                            NavigationLink(value: LedgerRoute.record(row.persistentModelID)) {
                                 LedgerRow(expense: row)
                             }
                         }
@@ -90,11 +90,6 @@ struct LedgerListView: View {
         .listSectionSpacing(14)
         .navigationTitle("资产流")
         .navigationBarTitleDisplayMode(.inline)
-        // Keep the destination alive even when its final record removes the entry button.
-        .navigationDestination(isPresented: $showingPending) { PendingLedgerView() }
-        .onChange(of: pending.isEmpty) { _, empty in
-            if empty { showingPending = false }
-        }
         .safeAreaInset(edge: .bottom) {
             HStack {
                 Text("\(filtered.count) 笔记录").font(.caption).foregroundStyle(.secondary)
@@ -189,7 +184,7 @@ struct PendingLedgerView: View {
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             ForEach(records) { row in
-                NavigationLink(value: row) {
+                NavigationLink(value: LedgerRoute.record(row.persistentModelID)) {
                     VStack(alignment: .leading, spacing: 6) {
                         LedgerRow(expense: row)
                         Text(row.reviewReason ?? "请核对").font(.caption).foregroundStyle(.orange)
@@ -199,6 +194,5 @@ struct PendingLedgerView: View {
         }
         .navigationTitle("待确认")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(for: Expense.self) { row in ExpenseDetailView(expense: row) }
     }
 }

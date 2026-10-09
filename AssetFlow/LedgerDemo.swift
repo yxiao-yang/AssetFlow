@@ -1,6 +1,7 @@
 #if DEBUG
 import Foundation
 import SwiftData
+import UIKit
 
 /// Explicit debug-only, in-memory data for simulator visual checks.
 @MainActor
@@ -30,6 +31,20 @@ enum LedgerDemo {
         let pending = Expense(amountInCents: 4600, category: "餐饮", note: "截图待确认", date: .now)
         pending.needsConfirmation = true
         pending.reviewReason = "未识别到扣款方式，请核对"
+        if CommandLine.arguments.contains("--demo-pending-image") {
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            let renderer = UIGraphicsImageRenderer(size: CGSize(width: 1290, height: 2796), format: format)
+            pending.screenshotData = renderer.image { image in
+                UIColor.white.setFill()
+                image.fill(CGRect(x: 0, y: 0, width: 1290, height: 2796))
+                ("示例账单\n支付成功\n-46.00\n支付时间 2026年10月7日 15:01:51" as NSString)
+                    .draw(in: CGRect(x: 80, y: 100, width: 1100, height: 900),
+                          withAttributes: [.font: UIFont.systemFont(ofSize: 48), .foregroundColor: UIColor.black])
+            }.pngData()
+            pending.rawText = "示例截图，用于验证带原图的待确认页面导航。"
+            pending.paymentChannel = "微信"
+        }
         context.insert(pending)
         try? context.save()
     }

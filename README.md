@@ -176,3 +176,12 @@ xcrun swiftc AssetFlow/Expense.swift AssetFlow/AssetMath.swift AssetFlow/TermDep
 微信原图检查参数：`/tmp/assetflow-ocr-checks /path/to/screenshot.png --wechat`。真实原图检查均在本机进行，测试仓库不保存用户截图。
 
 截图分类选择：快捷指令动作按收入／支出提供对应分类，识别建议的分类排在前面，最终分类以用户选择为准。选择分类不会消除金额、日期或交易状态的核对原因，有疑问的截图仍进入待确认。弹窗只在运行截图记账快捷指令时出现，普通截屏不会自行触发。已有快捷指令升级后可保持分类参数为空；若系统缓存旧动作，可删除并重新添加记账动作。系统弹窗交互与取消流程需要在 iPhone 上验证。
+
+
+设置和待确认导航 UI 回归检查：使用已启动的 iOS 模拟器运行以下命令（UDID 可由 `xcrun simctl list devices booted` 查看）：
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer python3 Tests/run-ios-ui-checks.py --device-id <模拟器UDID>
+```
+
+测试脚本生成独立 Xcode 测试工程，使用不同的 App bundle ID 和内存示例账本，不改动真实账本或项目签名配置。覆盖系统白天／夜间下设置页即时恢复跟随系统，以及带原图的待确认记录连续进入、滚动、返回和删除最后一笔；结束时恢复模拟器原外观。日志和截图保存在脚本输出的临时目录。
