@@ -15,6 +15,6 @@ trap 'rm -rf "$package_dir"' EXIT
 mkdir -p "$package_dir/Payload"
 # ditto preserves the native app bundle's metadata and executable permissions.
 ditto "$app_path" "$package_dir/Payload/AssetFlow.app"
-ditto -c -k --keepParent "$package_dir/Payload" "$output_dir/AssetFlow.ipa"
+ditto -c -k --norsrc --noextattr --keepParent "$package_dir/Payload" "$output_dir/AssetFlow.ipa"
 python3 "$repo_dir/Scripts/release-metadata.py" "$output_dir/AssetFlow.ipa" "$output_dir/update.json"
 printf 'IPA: %s\nManifest: %s\n' "$output_dir/AssetFlow.ipa" "$output_dir/update.json"

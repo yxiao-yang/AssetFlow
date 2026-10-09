@@ -9,6 +9,10 @@ from pathlib import Path
 ipa = Path(sys.argv[1])
 with zipfile.ZipFile(ipa) as archive:
     assert archive.testzip() is None, 'Damaged IPA'
+    names = archive.namelist()
+    assert not any(part.startswith('._') or part == '__MACOSX' for name in names for part in name.split('/')), 'macOS metadata must not be included in IPA'
+    roots = {name.split('/')[1] for name in names if name.startswith('Payload/') and len(name.split('/')) > 1 and name.split('/')[1]}
+    assert roots == {'AssetFlow.app'}, 'Payload must contain exactly one app bundle'
     info = plistlib.loads(archive.read('Payload/AssetFlow.app/Info.plist'))
     assert info['CFBundleIdentifier'] == 'com.modest.AssetFlow'
     assert info['CFBundleSupportedPlatforms'] == ['iPhoneOS']
