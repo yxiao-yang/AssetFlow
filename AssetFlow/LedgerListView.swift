@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct LedgerListView: View {
     @Binding var month: Date
@@ -9,6 +10,7 @@ struct LedgerListView: View {
     let pending: [Expense]
     let analytics: LedgerAnalytics
     let add: () -> Void
+    @State private var showingPending = false
 
     private var filtered: [Expense] {
         records.filter { row in
@@ -28,8 +30,8 @@ struct LedgerListView: View {
                 MonthSelector(month: $month) { clearFilters() }
                 summary
                 if !pending.isEmpty {
-                    NavigationLink {
-                        PendingLedgerView(records: pending)
+                    Button {
+                        showingPending = true
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "tray.fill").foregroundStyle(.orange)
@@ -38,9 +40,12 @@ struct LedgerListView: View {
                                 Text("核对后入账，暂不计入收支").font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
                         }
                         .padding(.vertical, 4)
                     }
+                    .buttonStyle(.plain)
                 }
                 }
             }
@@ -85,6 +90,11 @@ struct LedgerListView: View {
         .listSectionSpacing(14)
         .navigationTitle("资产流")
         .navigationBarTitleDisplayMode(.inline)
+        // Keep the destination alive even when its final record removes the entry button.
+        .navigationDestination(isPresented: $showingPending) { PendingLedgerView() }
+        .onChange(of: pending.isEmpty) { _, empty in
+            if empty { showingPending = false }
+        }
         .safeAreaInset(edge: .bottom) {
             HStack {
                 Text("\(filtered.count) 笔记录").font(.caption).foregroundStyle(.secondary)
@@ -170,7 +180,8 @@ struct LedgerRow: View {
 }
 
 struct PendingLedgerView: View {
-    let records: [Expense]
+    @Query(filter: #Predicate<Expense> { $0.needsConfirmation }, sort: \Expense.date, order: .reverse)
+    private var records: [Expense]
     var body: some View {
         List {
             Section {
@@ -178,13 +189,16 @@ struct PendingLedgerView: View {
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             ForEach(records) { row in
-                NavigationLink { ExpenseDetailView(expense: row) } label: {
+                NavigationLink(value: row) {
                     VStack(alignment: .leading, spacing: 6) {
                         LedgerRow(expense: row)
                         Text(row.reviewReason ?? "请核对").font(.caption).foregroundStyle(.orange)
                     }
                 }
             }
-        }.navigationTitle("待确认").navigationBarTitleDisplayMode(.inline)
+        }
+        .navigationTitle("待确认")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(for: Expense.self) { row in ExpenseDetailView(expense: row) }
     }
 }
